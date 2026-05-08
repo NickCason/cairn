@@ -1,0 +1,20 @@
+{
+  "name": "cairn",
+  "version": "0.1.0",
+  "description": "Live meeting transcription with speaker diarization",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc && tsc -p tsconfig.renderer.json",
+    "start": "npm run build && electron .",
+    "test:benchmark": "npm run build && node tests/test-runner.spec.mjs"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "@types/ws": "^8.5.13"
+  }
+}

@@ -6,3 +6,4 @@ out/
 cairn-build-stats/qwen-calls.jsonl
 benchmarks/*.wav
 benchmarks/*.mp3
+package-lock.json
