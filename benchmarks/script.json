@@ -1,0 +1,37 @@
+{
+  "title": "Rockwell PLC vendor sync",
+  "speakers": {
+    "JIM":   { "voice": "am_michael", "color": "#79c0ff", "role": "lead engineer" },
+    "MARIA": { "voice": "af_bella",   "color": "#e3b341", "role": "vendor rep"     },
+    "SARA":  { "voice": "af_sarah",   "color": "#56d364", "role": "your co-eng"    },
+    "DAVE":  { "voice": "am_adam",    "color": "#ff7b72", "role": "purchasing"     }
+  },
+  "lines": [
+    {"who":"JIM",   "text":"Alright everyone, let's lock in the controller pick for the new line."},
+    {"who":"MARIA", "text":"On our side we're recommending the seventeen fifty-six L 83 E. Six week lead time if we order by Friday."},
+    {"who":"JIM",   "text":"Got it. The eighty-three E gives us the redundancy slot we need?"},
+    {"who":"MARIA", "text":"Yes, and the Ethernet I P bandwidth is doubled compared to the L 75."},
+    {"who":"SARA",  "text":"What about the remote skids — are we keeping fifty sixty-nine I O on those?"},
+    {"who":"MARIA", "text":"The fifty sixty-nine L 320 E R will handle the remote drops, same Ethernet I P backbone."},
+    {"who":"DAVE",  "text":"From a purchasing angle, six weeks is tight. Can we get a unit pre-staged?"},
+    {"who":"MARIA", "text":"I can ask the warehouse if we have one on the shelf, but no promises."},
+    {"who":"JIM",   "text":"Okay let's also drop the legacy ControlNet gateway. Seventeen fifty-six C N 2 R is end of life."},
+    {"who":"SARA",  "text":"Agreed. Pure Ethernet I P everywhere. I'll update the network drawing tomorrow."},
+    {"who":"DAVE",  "text":"Send me the revised B O M before Friday close so I can cut the P O."},
+    {"who":"JIM",   "text":"Maria, can you confirm the L 83 E firmware version we're standardizing on?"},
+    {"who":"MARIA", "text":"Version thirty-six dot zero eleven is the latest stable. I'll send the release notes."},
+    {"who":"SARA",  "text":"Quick question — does the eighty-three E support the new safety task profile?"},
+    {"who":"MARIA", "text":"Yes, integrated safety with the GuardLogix variant. We can spec that if you need."},
+    {"who":"JIM",   "text":"Not for this line. Standard L 83 E is fine."},
+    {"who":"DAVE",  "text":"Lead time confirmed at six weeks then. Friday cutoff for the order."},
+    {"who":"JIM",   "text":"Sara, please verify the I O count against P and I D revision C."},
+    {"who":"SARA",  "text":"Will do. I'll have it back to you by tomorrow afternoon."},
+    {"who":"MARIA", "text":"One more thing — we're including a one year warranty extension at no charge."},
+    {"who":"JIM",   "text":"Appreciate that. Alright, I think we're aligned. Thanks everyone."},
+    {"who":"DAVE",  "text":"Thanks Maria, I'll be in touch on the P O."},
+    {"who":"SARA",  "text":"Thanks all."},
+    {"who":"MARIA", "text":"Thank you, talk soon."}
+  ],
+  "expected_part_numbers": ["1756-L83E", "5069-L320ER", "1756-CN2R"],
+  "expected_protocols": ["EtherNet/IP", "ControlNet"]
+}
