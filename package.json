@@ -32,6 +32,7 @@
       "dist/**/*",
       "src/renderer/index.html",
       "src/renderer/style.css",
+      "src/renderer/audio-worklet.js",
       "src/icons/**/*",
       "benchmarks/**/*",
       "package.json"

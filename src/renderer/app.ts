@@ -69,7 +69,12 @@ async function finalizeSession() {
   setTimeout(() => window.close(), dwell);
 }
 
-$stop.onclick = () => ws?.stop();
+let stopAudio: (() => Promise<void>) | null = null;
+
+$stop.onclick = async () => {
+  if (stopAudio) { try { await stopAudio(); } catch {} stopAudio = null; }
+  ws?.stop();
+};
 
 window.cairn.onInit(async ({ testFile, screenshotMode, demoMode }: { testFile: string|null; screenshotMode?: string|null; demoMode?: string|null }) => {
   // Screenshot fixture mode: skip WebSocket entirely, populate with fake data
@@ -96,5 +101,16 @@ window.cairn.onInit(async ({ testFile, screenshotMode, demoMode }: { testFile: s
     const speed = demoMode ? 1.0 : 2.0;
     await streamWavFile(testFile, (buf: ArrayBuffer) => ws!.sendAudio(buf), speed);
     setTimeout(() => ws?.stop(), 6000);
+  } else {
+    // Live mode: capture from default input device, stream PCM chunks to n4.
+    const { startLiveCapture } = await import("./audio.js");
+    try {
+      stopAudio = await startLiveCapture(
+        (chunk: ArrayBuffer) => ws!.sendAudio(chunk),
+        (err: Error) => { $status.textContent = `mic error: ${err.message}`; },
+      );
+    } catch (err) {
+      console.error("live capture failed:", err);
+    }
   }
 });
