@@ -36,3 +36,20 @@ ipcMain.handle("read-file", async (_e, p: string) => {
   const fs = require("fs/promises");
   return await fs.readFile(p);
 });
+
+ipcMain.handle("save-session", async (_e, { meetingName, events }: { meetingName: string; events: any[] }) => {
+  const fs = require("fs/promises");
+  const path = require("path");
+  const os = require("os");
+  const date = new Date().toISOString().slice(0, 10);
+  const slug = meetingName.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+  const dir = path.join(os.homedir(), "Documents", "Cairn", `${date}-${slug}`);
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(path.join(dir, "transcript.jsonl"), events.map(e => JSON.stringify(e)).join("\n") + "\n");
+  await fs.writeFile(path.join(dir, "meta.json"), JSON.stringify({
+    meeting_name: meetingName,
+    saved_at: new Date().toISOString(),
+    event_count: events.length,
+  }, null, 2));
+  return dir;
+});
