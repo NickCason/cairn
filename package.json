@@ -8,15 +8,48 @@
     "start": "npm run build && electron .",
     "test:benchmark": "npm run build && node tests/test-runner.spec.mjs",
     "screenshot": "npm run build && npx electron . --screenshot-mode=light && npx electron . --screenshot-mode=dark",
-    "record-demos": "bash scripts/record-demos.sh"
+    "record-demos": "bash scripts/record-demos.sh",
+    "package": "npm run build && electron-builder --mac --dir",
+    "install-app": "npm run package && rm -rf /Applications/Cairn.app && cp -R dist-app/mac-arm64/Cairn.app /Applications/Cairn.app && xattr -dr com.apple.quarantine /Applications/Cairn.app 2>/dev/null || true && echo 'Cairn installed at /Applications/Cairn.app'"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "electron": "^32.0.0",
-    "typescript": "^5.6.0",
-    "@types/node": "^22.0.0"
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.6.0"
   },
   "dependencies": {
-    "ws": "^8.18.0",
-    "@types/ws": "^8.5.13"
+    "@types/ws": "^8.5.13",
+    "ws": "^8.18.0"
+  },
+  "build": {
+    "appId": "com.fleet.cairn",
+    "productName": "Cairn",
+    "directories": {
+      "output": "dist-app"
+    },
+    "files": [
+      "dist/**/*",
+      "src/renderer/index.html",
+      "src/renderer/style.css",
+      "src/icons/**/*",
+      "benchmarks/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "icon": "src/icons/cairn-icon.png",
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dir",
+          "arch": "arm64"
+        }
+      ],
+      "identity": null,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Cairn captures audio from Microsoft Teams calls and your microphone for live transcription on your local fleet.",
+        "NSCameraUsageDescription": "Cairn does not use the camera."
+      }
+    }
   }
 }
