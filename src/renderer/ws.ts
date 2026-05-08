@@ -3,7 +3,10 @@ export type TranscriptFinal = { type:"transcript_final"; seq:number; text:string
 export type SpeakerAssigned = { type:"speaker_assigned"; speaker_id:string; color_hint:string };
 export type Ack = { type:"ack"; of:string; session_id:string };
 export type ErrorMsg = { type:"error"; code:string; message:string };
-export type ServerMsg = TranscriptPartial | TranscriptFinal | SpeakerAssigned | Ack | ErrorMsg;
+export type RollingSummaryMsg = { type:"rolling_summary"; idx:number; window_start_s:number; window_end_s:number; bullets:string[]; generated_at:number; merged_from_failed_prior:boolean };
+export type RollingReplaceMsg = { type:"rolling_summary_replace"; idx:number; bullets:string[]; generated_at:number; reason:string };
+export type FinalSummaryMsg = { type:"final_summary"; ok:boolean; [key:string]:unknown };
+export type ServerMsg = TranscriptPartial | TranscriptFinal | SpeakerAssigned | Ack | ErrorMsg | RollingSummaryMsg | RollingReplaceMsg | FinalSummaryMsg;
 
 export class CairnWS {
   private ws: WebSocket | null = null;

@@ -1,6 +1,7 @@
 import { CairnWS, TranscriptFinal, TranscriptPartial, SpeakerAssigned, ServerMsg } from "./ws.js";
 import { TranscriptView } from "./transcript.js";
 import { SpeakersPanel } from "./speakers.js";
+import { handleRollingSummary, handleRollingReplace, handleFinalSummary } from "./summary.js";
 
 const CAIRN_SVC_URL = "ws://100.99.99.72:8300/ws/transcribe";
 
@@ -146,6 +147,12 @@ function onMsg(m: ServerMsg) {
     transcript.final(m as TranscriptFinal, { name: sp.name, color: sp.color });
   } else if (m.type === "speaker_assigned") {
     speakers.add(m.speaker_id, m.color_hint);
+  } else if (m.type === "rolling_summary") {
+    handleRollingSummary(m as any);
+  } else if (m.type === "rolling_summary_replace") {
+    handleRollingReplace(m as any);
+  } else if (m.type === "final_summary") {
+    handleFinalSummary(m as any);
   } else if (m.type === "ack" && m.of === "start") {
     started = Date.now();
     elapsedTimer = window.setInterval(() => {
