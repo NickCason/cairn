@@ -21,12 +21,14 @@ async function createWindow() {
       nodeIntegration: false,
     },
   });
-  await win.loadFile(path.join(__dirname, "..", "src", "renderer", "index.html"));
 
+  // Register did-finish-load BEFORE loadFile so the event is never missed.
   const testFile = getTestFile();
   win.webContents.on("did-finish-load", () => {
     win?.webContents.send("init", { testFile });
   });
+
+  await win.loadFile(path.join(__dirname, "..", "src", "renderer", "index.html"));
 }
 
 app.whenReady().then(createWindow);

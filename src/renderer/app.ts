@@ -1,6 +1,6 @@
-import { CairnWS, TranscriptFinal, TranscriptPartial, SpeakerAssigned, ServerMsg } from "./ws";
-import { TranscriptView } from "./transcript";
-import { SpeakersPanel } from "./speakers";
+import { CairnWS, TranscriptFinal, TranscriptPartial, SpeakerAssigned, ServerMsg } from "./ws.js";
+import { TranscriptView } from "./transcript.js";
+import { SpeakersPanel } from "./speakers.js";
 
 const CAIRN_SVC_URL = "ws://100.99.99.72:8300/ws/transcribe";
 
@@ -73,7 +73,8 @@ window.cairn.onInit(async ({ testFile }: { testFile: string|null }) => {
   $meeting.textContent = testFile ? `benchmark · ${testFile.split("/").pop()}` : "Cairn";
   ws = new CairnWS(CAIRN_SVC_URL, onMsg, (s) => $status.textContent = s);
   await ws.connect();
-  ws.start(meetingName);
+  // Pass num_speakers=4 hint in benchmark mode so diarizer uses exact count
+  ws.start(meetingName, testFile ? 4 : undefined);
 
   if (testFile) {
     const { streamWavFile } = await import("./test-runner.js");
