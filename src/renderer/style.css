@@ -21,7 +21,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--fg); }
 body { display: flex; flex-direction: column; overflow: hidden; }
-.titlebar { display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: var(--pane-bg);
+.titlebar { display: flex; align-items: center; gap: 12px; padding: 8px 16px 8px 88px; background: var(--pane-bg);
             border-bottom: 1px solid var(--border); user-select: none; -webkit-app-region: drag; }
 .titlebar > * { -webkit-app-region: no-drag; }
 .logo { width: 22px; height: 22px; color: var(--logo-bg); display: inline-block; }

@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, nativeTheme } from "electron";
 import * as path from "path";
+import * as fs from "fs";
 
 // Parse CLI: --test-file=<path>
 function getTestFile(): string | null {
@@ -7,14 +8,25 @@ function getTestFile(): string | null {
   return arg ? arg.split("=", 2)[1] : null;
 }
 
+// Parse CLI: --screenshot-mode=<light|dark>
+function getScreenshotMode(): "light" | "dark" | null {
+  const arg = process.argv.find(a => a.startsWith("--screenshot-mode="));
+  if (!arg) return null;
+  const val = arg.split("=", 2)[1];
+  if (val === "light" || val === "dark") return val;
+  return null;
+}
+
 let win: BrowserWindow | null = null;
 
 async function createWindow() {
+  const screenshotMode = getScreenshotMode();
+
   win = new BrowserWindow({
     width: 1100,
     height: 720,
     titleBarStyle: "hiddenInset",
-    backgroundColor: "#0d1117",
+    backgroundColor: screenshotMode === "light" ? "#f5f5f7" : "#0d1117",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -25,13 +37,41 @@ async function createWindow() {
   // Register did-finish-load BEFORE loadFile so the event is never missed.
   const testFile = getTestFile();
   win.webContents.on("did-finish-load", () => {
-    win?.webContents.send("init", { testFile });
+    win?.webContents.send("init", { testFile, screenshotMode });
   });
 
   await win.loadFile(path.join(__dirname, "..", "src", "renderer", "index.html"));
+
+  // Screenshot capture: wait 4 s for fixture content to render, then capture + quit
+  if (screenshotMode) {
+    setTimeout(async () => {
+      if (!win) return;
+      try {
+        const image = await win.webContents.capturePage();
+        const screenshotsDir = path.join(__dirname, "..", "screenshots");
+        fs.mkdirSync(screenshotsDir, { recursive: true });
+        const outPath = path.join(screenshotsDir, `cairn-${screenshotMode}.png`);
+        fs.writeFileSync(outPath, image.toPNG());
+        console.log(`Screenshot saved: ${outPath}`);
+      } catch (err) {
+        console.error("Screenshot failed:", err);
+      } finally {
+        app.quit();
+      }
+    }, 4000);
+  }
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  const screenshotMode = getScreenshotMode();
+  // Force theme BEFORE window creation
+  if (screenshotMode === "light") {
+    nativeTheme.themeSource = "light";
+  } else if (screenshotMode === "dark") {
+    nativeTheme.themeSource = "dark";
+  }
+  createWindow();
+});
 app.on("window-all-closed", () => app.quit());
 
 ipcMain.handle("read-file", async (_e, p: string) => {

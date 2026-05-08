@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc && tsc -p tsconfig.renderer.json",
     "start": "npm run build && electron .",
-    "test:benchmark": "npm run build && node tests/test-runner.spec.mjs"
+    "test:benchmark": "npm run build && node tests/test-runner.spec.mjs",
+    "screenshot": "npm run build && npx electron . --screenshot-mode=light && npx electron . --screenshot-mode=dark"
   },
   "devDependencies": {
     "electron": "^32.0.0",

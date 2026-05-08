@@ -68,7 +68,16 @@ async function finalizeSession() {
 
 $stop.onclick = () => ws?.stop();
 
-window.cairn.onInit(async ({ testFile }: { testFile: string|null }) => {
+window.cairn.onInit(async ({ testFile, screenshotMode }: { testFile: string|null; screenshotMode?: string|null }) => {
+  // Screenshot fixture mode: skip WebSocket entirely, populate with fake data
+  if (screenshotMode) {
+    meetingName = "vendor-sync";
+    $status.textContent = "live · recording";
+    const { loadFixture } = await import("./screenshot-fixture.js");
+    loadFixture(onMsg, $elapsed, $meeting, $recdot, $stop);
+    return;
+  }
+
   meetingName = testFile ? "benchmark-four-speaker" : "live";
   $meeting.textContent = testFile ? `benchmark · ${testFile.split("/").pop()}` : "Cairn";
   ws = new CairnWS(CAIRN_SVC_URL, onMsg, (s) => $status.textContent = s);
