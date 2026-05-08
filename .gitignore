@@ -1,0 +1,8 @@
+node_modules/
+dist/
+out/
+.DS_Store
+*.log
+cairn-build-stats/qwen-calls.jsonl
+benchmarks/*.wav
+benchmarks/*.mp3
