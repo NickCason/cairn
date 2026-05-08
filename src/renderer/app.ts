@@ -36,6 +36,10 @@ const $meeting = document.getElementById("meeting")!;
 const $speakersToggle = document.getElementById("speakers-toggle")! as HTMLButtonElement;
 const $clear = document.getElementById("clearbtn")! as HTMLButtonElement;
 const $devicePicker = document.getElementById("device-picker")! as HTMLSelectElement;
+const $viewTranscript = document.getElementById("view-transcript") as HTMLButtonElement | null;
+const $viewSummary = document.getElementById("view-summary") as HTMLButtonElement | null;
+const $transcriptLines = document.getElementById("transcript-lines");
+const $finalSummary = document.getElementById("final-summary");
 
 (async () => {
   const svgRes = await fetch("../icons/cairn.svg");
@@ -246,6 +250,15 @@ async function startLiveSession() {
 }
 
 $start.onclick = () => { startLiveSession(); };
+
+$viewTranscript?.addEventListener("click", () => {
+  if ($transcriptLines) $transcriptLines.hidden = false;
+  if ($finalSummary) $finalSummary.hidden = true;
+});
+$viewSummary?.addEventListener("click", () => {
+  if ($transcriptLines) $transcriptLines.hidden = true;
+  if ($finalSummary) $finalSummary.hidden = false;
+});
 
 window.cairn.onInit(async ({ testFile, screenshotMode, demoMode, numSpeakers }: { testFile: string|null; screenshotMode?: string|null; demoMode?: string|null; numSpeakers?: number|null }) => {
   // Screenshot fixture mode: skip WebSocket entirely, populate with fake data
