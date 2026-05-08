@@ -55,7 +55,7 @@ Qwen 3.6 35B-A3B via Ollama on the P4000 node offered mixed utility for the Cair
 ## Known caveats / next steps
 
 - **Part number recognition (1/3):** whisper-base misses `5069-L320ER` and `1756-CN2R`. The benchmark threshold was intentionally loosened from `ceil(n/2)` to `≥1` to pass. Upgrading to whisper-large-v3 or adding a post-hoc LLM cleanup pass would improve recall.
-- **Speaker count requires hint:** without `num_speakers=4` in the start message, simple-diarizer clusters to 2 speakers using auto-detect threshold=0.4. Benchmark passes `num_speakers=4` explicitly; live mode would need user input or a dynamic detection step.
+- **Speaker count auto-detect:** the benchmark now passes WITHOUT a `num_speakers` hint after the pyannote 3.3.1 swap (commit `0bc92f4` on n4). Simple-diarizer baseline required the hint. See `ACCURACY.md` for the side-by-side.
 - **Live mode untested:** BlackHole 2ch is installed; live microphone input path compiles and links but was not exercised. Would need `getUserMedia` + `AudioWorklet` wiring.
-- **Diarization backend:** pyannote 3.x was attempted but reverted due to torchaudio 2.7+ `AudioMetaData` removal and `use_auth_token` deprecation. simple-diarizer (ECAPA-TDNN + spectral clustering) is the current backend — ungated, no HF token required.
+- **Diarization backend:** pyannote.audio 3.3.1 (CPU, end-to-end neural) is now the current backend. Required pinning `huggingface-hub<1.0` (the `use_auth_token` shim was removed in v1.0), `numpy<2.0`, `torchaudio<2.9`, and a runtime monkey-patch for `torch.load(weights_only=True)`. See `docs/superpowers/specs/2026-05-08-cairn-pyannote-reintegration.md` in the fleet repo for the post-mortem.
 - **steeLL-v1 (qwen3.6:35b-a3b):** P4000 throughput (~5 tok/s) makes it impractical for interactive debugging. Useful for first-draft boilerplate on isolated tasks.
