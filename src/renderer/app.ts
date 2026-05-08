@@ -82,8 +82,8 @@ window.cairn.onInit(async ({ testFile, screenshotMode }: { testFile: string|null
   $meeting.textContent = testFile ? `benchmark · ${testFile.split("/").pop()}` : "Cairn";
   ws = new CairnWS(CAIRN_SVC_URL, onMsg, (s) => $status.textContent = s);
   await ws.connect();
-  // Pass num_speakers=4 hint in benchmark mode so diarizer uses exact count
-  ws.start(meetingName, testFile ? 4 : undefined);
+  // No num_speakers hint — let pyannote auto-detect speaker count
+  ws.start(meetingName);
 
   if (testFile) {
     const { streamWavFile } = await import("./test-runner.js");
