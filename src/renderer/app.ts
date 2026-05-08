@@ -25,6 +25,7 @@ const $logo = document.getElementById("logo")!;
 const $meeting = document.getElementById("meeting")!;
 const $speakersToggle = document.getElementById("speakers-toggle")! as HTMLButtonElement;
 const $clear = document.getElementById("clearbtn")! as HTMLButtonElement;
+const $devicePicker = document.getElementById("device-picker")! as HTMLSelectElement;
 
 (async () => {
   const svgRes = await fetch("../icons/cairn.svg");
@@ -61,6 +62,63 @@ function refreshSpeakerToggleLabel() {
   $speakersToggle.textContent = speakerLabel(currentSpeakers);
 }
 refreshSpeakerToggleLabel();
+
+// === Device picker ===
+function loadDeviceId(): string {
+  return localStorage.getItem("cairn.deviceId") ?? "default";
+}
+function saveDeviceId(id: string) {
+  localStorage.setItem("cairn.deviceId", id);
+}
+let currentDeviceId = loadDeviceId();
+
+async function refreshDeviceList() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const inputs = devices.filter(d => d.kind === "audioinput");
+    const prevValue = currentDeviceId;
+    $devicePicker.innerHTML = "";
+    const defaultOpt = document.createElement("option");
+    defaultOpt.value = "default";
+    defaultOpt.textContent = "Default input";
+    $devicePicker.appendChild(defaultOpt);
+    for (const d of inputs) {
+      const opt = document.createElement("option");
+      opt.value = d.deviceId;
+      // Label may be empty before mic permission is granted; show fallback.
+      opt.textContent = d.label || `Device ${d.deviceId.slice(0, 6)}`;
+      $devicePicker.appendChild(opt);
+    }
+    // Restore selection if still present, otherwise fall back to default
+    const exists = Array.from($devicePicker.options).some(o => o.value === prevValue);
+    $devicePicker.value = exists ? prevValue : "default";
+    currentDeviceId = $devicePicker.value;
+  } catch (err) {
+    console.warn("enumerateDevices failed:", err);
+  }
+}
+refreshDeviceList();
+
+$devicePicker.onchange = async () => {
+  currentDeviceId = $devicePicker.value;
+  saveDeviceId(currentDeviceId);
+  // If a session is currently capturing, restart audio with the new device
+  if (stopAudio && ws) {
+    const oldStop = stopAudio;
+    stopAudio = null;
+    try { await oldStop(); } catch {}
+    const { startLiveCapture } = await import("./audio.js");
+    try {
+      stopAudio = await startLiveCapture(
+        (chunk: ArrayBuffer) => ws!.sendAudio(chunk),
+        (err: Error) => { $status.textContent = `mic error: ${err.message}`; },
+        currentDeviceId,
+      );
+    } catch (err) {
+      console.error("device switch failed:", err);
+    }
+  }
+};
 
 $speakersToggle.onclick = () => {
   const idx = SPEAKER_VALUES.findIndex(v => v === currentSpeakers);
@@ -160,7 +218,10 @@ async function startLiveSession() {
     stopAudio = await startLiveCapture(
       (chunk: ArrayBuffer) => ws!.sendAudio(chunk),
       (err: Error) => { $status.textContent = `mic error: ${err.message}`; },
+      currentDeviceId,
     );
+    // Permission is now granted — re-enumerate so labels populate
+    refreshDeviceList();
   } catch (err) {
     console.error("live capture failed:", err);
     $status.textContent = "mic error";
@@ -207,13 +268,16 @@ window.cairn.onInit(async ({ testFile, screenshotMode, demoMode, numSpeakers }: 
     await streamWavFile(testFile, (buf: ArrayBuffer) => ws!.sendAudio(buf), speed);
     setTimeout(() => ws?.stop(), 6000);
   } else {
-    // Live mode: capture from default input device, stream PCM chunks to n4.
+    // Live mode: capture from selected input device, stream PCM chunks to n4.
     const { startLiveCapture } = await import("./audio.js");
     try {
       stopAudio = await startLiveCapture(
         (chunk: ArrayBuffer) => ws!.sendAudio(chunk),
         (err: Error) => { $status.textContent = `mic error: ${err.message}`; },
+        currentDeviceId,
       );
+      // Re-enumerate now that permission is granted (labels become readable)
+      refreshDeviceList();
     } catch (err) {
       console.error("live capture failed:", err);
     }

@@ -5,16 +5,21 @@ export type AudioStopFn = () => Promise<void>;
 export async function startLiveCapture(
   send: (chunk: ArrayBuffer) => void,
   onError: (err: Error) => void,
+  deviceId?: string | null,
 ): Promise<AudioStopFn> {
   let stream: MediaStream;
   try {
+    const audioConstraints: MediaTrackConstraints = {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+      channelCount: 1,
+    };
+    if (deviceId && deviceId !== "default") {
+      audioConstraints.deviceId = { exact: deviceId };
+    }
     stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-        channelCount: 1,
-      },
+      audio: audioConstraints,
       video: false,
     });
   } catch (err) {
