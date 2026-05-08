@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Cairn</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="titlebar">
+    <span id="logo" class="logo"></span>
+    <span id="recdot" class="recdot" hidden></span>
+    <span id="elapsed" class="elapsed">00:00:00</span>
+    <span id="meeting" class="meeting">Cairn</span>
+    <span id="status" class="status">disconnected</span>
+    <button id="stopbtn" class="stopbtn" hidden>Stop</button>
+  </header>
+
+  <main class="body">
+    <section class="pane transcript">
+      <h2 class="pane-title">Transcript</h2>
+      <div id="transcript-lines"></div>
+    </section>
+    <aside class="pane sidebar">
+      <h2 class="pane-title">Speakers</h2>
+      <div id="speakers"></div>
+      <h2 class="pane-title summary-title">Last 2 min</h2>
+      <div id="summary" class="summary-stub">—</div>
+    </aside>
+  </main>
+
+  <script src="../../dist/renderer/app.js" type="module"></script>
+</body>
+</html>

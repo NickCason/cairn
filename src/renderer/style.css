@@ -1,0 +1,57 @@
+:root {
+  --bg: #f5f5f7; --fg: #1d1d1f;
+  --pane-bg: #ffffff; --pane-bg-2: #f5f5f7;
+  --border: #d2d2d7; --muted: #6e6e73;
+  --rec: #ff3b30; --accent: #007aff;
+  --logo-bg: #0d1117; --logo-fg: #f5f5f7;
+  --speaker-1: #0040dd; --speaker-2: #b35900;
+  --speaker-3: #1f7a3a; --speaker-4: #c2185b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117; --fg: #c9d1d9;
+    --pane-bg: #161b22; --pane-bg-2: #0d1117;
+    --border: #30363d; --muted: #8b949e;
+    --rec: #f85149; --accent: #79c0ff;
+    --logo-bg: #f5f5f7; --logo-fg: #0d1117;
+    --speaker-1: #79c0ff; --speaker-2: #e3b341;
+    --speaker-3: #56d364; --speaker-4: #ff7b72;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+body { display: flex; flex-direction: column; overflow: hidden; }
+.titlebar { display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: var(--pane-bg);
+            border-bottom: 1px solid var(--border); user-select: none; -webkit-app-region: drag; }
+.titlebar > * { -webkit-app-region: no-drag; }
+.logo { width: 22px; height: 22px; color: var(--logo-bg); display: inline-block; }
+.logo svg { width: 100%; height: 100%; }
+.recdot { width: 8px; height: 8px; border-radius: 50%; background: var(--rec); animation: pulse 1.4s infinite; }
+@keyframes pulse { 50% { opacity: 0.3; } }
+.elapsed { font-family: ui-monospace, monospace; color: var(--muted); font-size: 12px; min-width: 60px; }
+.meeting { color: var(--muted); font-size: 12px; }
+.status { margin-left: auto; color: var(--muted); font-size: 11px; font-family: ui-monospace, monospace; }
+.stopbtn { padding: 4px 12px; border: 1px solid var(--border); background: var(--pane-bg-2);
+           color: var(--fg); border-radius: 5px; font-size: 12px; cursor: pointer; }
+
+.body { flex: 1; display: flex; min-height: 0; }
+.pane { padding: 14px 18px; overflow-y: auto; }
+.transcript { flex: 2; border-right: 1px solid var(--border); }
+.sidebar { flex: 1; background: var(--pane-bg-2); }
+.pane-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted);
+              margin: 0 0 10px; font-weight: 600; }
+.summary-title { margin-top: 18px; }
+
+.line { margin-bottom: 8px; line-height: 1.5; font-size: 13px; }
+.line .spk { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px;
+             font-weight: 600; margin-right: 6px; vertical-align: 2px; }
+.line.partial .text { color: var(--muted); font-style: italic; }
+
+.spkrow { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 5px;
+          background: var(--pane-bg); border: 1px solid var(--border); margin-bottom: 4px; }
+.swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; cursor: pointer; }
+.spkname { flex: 1; font-size: 13px; outline: none; cursor: text; }
+.spkname[contenteditable="true"]:focus { background: var(--pane-bg-2); border-radius: 3px; padding: 0 4px; }
+
+.summary-stub { color: var(--muted); font-size: 12px; padding: 10px;
+                background: var(--pane-bg); border: 1px solid var(--border); border-radius: 5px; }
