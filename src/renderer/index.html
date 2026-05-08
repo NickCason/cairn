@@ -17,18 +17,23 @@
     <button id="clearbtn" class="ghostbtn" hidden>Clear</button>
     <button id="stopbtn" class="stopbtn" hidden>Stop</button>
     <button id="startbtn" class="stopbtn" hidden>Start</button>
+    <button id="view-transcript" class="ghostbtn" hidden>Transcript</button>
+    <button id="view-summary" class="ghostbtn" hidden>Summary</button>
   </header>
 
   <main class="body">
     <section class="pane transcript">
       <h2 class="pane-title">Transcript</h2>
       <div id="transcript-lines"></div>
+      <div id="final-summary" hidden></div>
     </section>
     <aside class="pane sidebar">
       <h2 class="pane-title">Speakers</h2>
       <div id="speakers"></div>
-      <h2 class="pane-title summary-title">Last 2 min</h2>
-      <div id="summary" class="summary-stub">—</div>
+      <h2 class="pane-title summary-title">Rolling summary</h2>
+      <div id="rolling-list" class="rolling-list">
+        <div class="rolling-empty">No summary yet — first recap appears around 2:00.</div>
+      </div>
     </aside>
   </main>
 

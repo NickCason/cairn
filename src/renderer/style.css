@@ -81,3 +81,31 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 
 .summary-stub { color: var(--muted); font-size: 12px; padding: 10px;
                 background: var(--pane-bg); border: 1px solid var(--border); border-radius: 5px; }
+
+.rolling-list { display: flex; flex-direction: column; gap: 8px; }
+.rolling-empty { color: var(--muted); font-size: 12px; padding: 10px;
+                 background: var(--pane-bg); border: 1px solid var(--border);
+                 border-radius: 5px; }
+.roll-entry { background: var(--pane-bg); border: 1px solid var(--border);
+              border-radius: 5px; padding: 8px 10px; font-size: 12px; }
+.roll-entry.changed { animation: roll-flash 1s ease-out; }
+@keyframes roll-flash { from { background: var(--pane-bg-2); } to { background: var(--pane-bg); } }
+.roll-time { color: var(--muted); font-size: 10px; text-transform: uppercase;
+             letter-spacing: 0.4px; margin-bottom: 4px; }
+.roll-time .merged { color: var(--accent); margin-left: 4px; }
+.roll-bullets { margin: 0; padding: 0; list-style: none; }
+.roll-bullets li { padding: 2px 0 2px 12px; position: relative; }
+.roll-bullets li::before { content: "•"; position: absolute; left: 2px; color: var(--muted); }
+
+#final-summary { padding: 14px 0; font-size: 13px; }
+#final-summary h3 { font-size: 13px; text-transform: uppercase;
+                    letter-spacing: 0.6px; color: var(--muted);
+                    margin: 18px 0 8px; }
+#final-summary .tldr { font-size: 14px; line-height: 1.5; margin-bottom: 12px; }
+#final-summary table.actions { width: 100%; border-collapse: collapse; font-size: 12px; }
+#final-summary table.actions th, #final-summary table.actions td {
+  text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border);
+}
+#final-summary .truncated-banner { background: var(--pane-bg-2); border: 1px solid var(--border);
+                                   border-radius: 4px; padding: 6px 10px; font-size: 11px;
+                                   color: var(--muted); margin-bottom: 12px; }
