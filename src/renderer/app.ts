@@ -41,7 +41,7 @@ let isLiveMode = false;
 let isBenchmarkMode = false;
 
 // Speaker-count toggle: cycles through these values. null = auto.
-const SPEAKER_VALUES: (number | null)[] = [null, 1, 2, 3, 4, 6];
+const SPEAKER_VALUES: (number | null)[] = [null, 1, 2, 3, 4, 5, 6, 8];
 function loadSpeakers(): number | null {
   const saved = localStorage.getItem("cairn.numSpeakers");
   if (saved === null) return 1; // first-launch default for live mode
