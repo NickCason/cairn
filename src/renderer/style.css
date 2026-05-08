@@ -37,6 +37,9 @@ body { display: flex; flex-direction: column; overflow: hidden; }
                    color: var(--muted); border-radius: 4px; font-size: 11px; font-family: ui-monospace, monospace;
                    cursor: pointer; }
 .speakers-toggle:hover { color: var(--fg); border-color: var(--accent); }
+.ghostbtn { padding: 3px 10px; border: 1px solid transparent; background: transparent;
+            color: var(--muted); border-radius: 4px; font-size: 11px; cursor: pointer; }
+.ghostbtn:hover { color: var(--fg); border-color: var(--border); }
 
 .body { flex: 1; display: flex; min-height: 0; }
 .pane { padding: 14px 18px; overflow-y: auto; }

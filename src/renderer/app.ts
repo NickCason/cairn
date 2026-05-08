@@ -24,6 +24,7 @@ const $start = document.getElementById("startbtn")! as HTMLButtonElement;
 const $logo = document.getElementById("logo")!;
 const $meeting = document.getElementById("meeting")!;
 const $speakersToggle = document.getElementById("speakers-toggle")! as HTMLButtonElement;
+const $clear = document.getElementById("clearbtn")! as HTMLButtonElement;
 
 (async () => {
   const svgRes = await fetch("../icons/cairn.svg");
@@ -113,7 +114,21 @@ async function finalizeSession() {
   $start.hidden = false;
   $start.disabled = false;
   $start.textContent = "Start";
+  $clear.hidden = false;
 }
+
+function clearTranscript() {
+  document.getElementById("transcript-lines")!.innerHTML = "";
+  document.getElementById("speakers")!.innerHTML = "";
+  $elapsed.textContent = "00:00:00";
+  eventsLog = [];
+  // Reset speakers panel internal state so renamed/colored speakers from prior session don't carry over
+  speakers.reset();
+  $clear.hidden = true;
+  $status.textContent = "ready";
+}
+
+$clear.onclick = clearTranscript;
 
 $stop.onclick = async () => {
   $stop.disabled = true;
@@ -126,6 +141,7 @@ $stop.onclick = async () => {
 
 async function startLiveSession() {
   $start.hidden = true;
+  $clear.hidden = true;
   $status.textContent = "connecting…";
   // Reset event log, transcript, and elapsed clock for the new session
   eventsLog = [];
