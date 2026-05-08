@@ -56,19 +56,22 @@ function onMsg(m: ServerMsg) {
   }
 }
 
+let demoModeActive: string | null = null;
+
 async function finalizeSession() {
   $recdot.hidden = true;
   $stop.hidden = true;
   if (elapsedTimer) clearInterval(elapsedTimer);
   const dir = await window.cairn.saveSession(meetingName, eventsLog);
   $status.textContent = `saved → ${dir}`;
-  // for benchmark: quit after a short delay so the wrapper can read JSONL
-  setTimeout(() => window.close(), 1500);
+  // demo-mode: linger 5 s so recording captures final state; benchmark: 1.5 s
+  const dwell = demoModeActive ? 5000 : 1500;
+  setTimeout(() => window.close(), dwell);
 }
 
 $stop.onclick = () => ws?.stop();
 
-window.cairn.onInit(async ({ testFile, screenshotMode }: { testFile: string|null; screenshotMode?: string|null }) => {
+window.cairn.onInit(async ({ testFile, screenshotMode, demoMode }: { testFile: string|null; screenshotMode?: string|null; demoMode?: string|null }) => {
   // Screenshot fixture mode: skip WebSocket entirely, populate with fake data
   if (screenshotMode) {
     meetingName = "vendor-sync";
@@ -77,6 +80,8 @@ window.cairn.onInit(async ({ testFile, screenshotMode }: { testFile: string|null
     loadFixture(onMsg, $elapsed, $meeting, $recdot, $stop);
     return;
   }
+
+  if (demoMode) demoModeActive = demoMode;
 
   meetingName = testFile ? "benchmark-four-speaker" : "live";
   $meeting.textContent = testFile ? `benchmark · ${testFile.split("/").pop()}` : "Cairn";
@@ -87,7 +92,9 @@ window.cairn.onInit(async ({ testFile, screenshotMode }: { testFile: string|null
 
   if (testFile) {
     const { streamWavFile } = await import("./test-runner.js");
-    await streamWavFile(testFile, (buf: ArrayBuffer) => ws!.sendAudio(buf));
+    // demo-mode: real-time (1×); benchmark path: 2× for faster turnaround
+    const speed = demoMode ? 1.0 : 2.0;
+    await streamWavFile(testFile, (buf: ArrayBuffer) => ws!.sendAudio(buf), speed);
     setTimeout(() => ws?.stop(), 6000);
   }
 });

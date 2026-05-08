@@ -17,16 +17,27 @@ function getScreenshotMode(): "light" | "dark" | null {
   return null;
 }
 
+// Parse CLI: --demo-mode=<light|dark>
+function getDemoMode(): "light" | "dark" | null {
+  const arg = process.argv.find(a => a.startsWith("--demo-mode="));
+  if (!arg) return null;
+  const val = arg.split("=", 2)[1];
+  if (val === "light" || val === "dark") return val;
+  return null;
+}
+
 let win: BrowserWindow | null = null;
 
 async function createWindow() {
   const screenshotMode = getScreenshotMode();
+  const demoMode = getDemoMode();
+  const themeMode = screenshotMode || demoMode;
 
   win = new BrowserWindow({
     width: 1100,
     height: 720,
     titleBarStyle: "hiddenInset",
-    backgroundColor: screenshotMode === "light" ? "#f5f5f7" : "#0d1117",
+    backgroundColor: themeMode === "light" ? "#f5f5f7" : "#0d1117",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -37,10 +48,14 @@ async function createWindow() {
   // Register did-finish-load BEFORE loadFile so the event is never missed.
   const testFile = getTestFile();
   win.webContents.on("did-finish-load", () => {
-    win?.webContents.send("init", { testFile, screenshotMode });
+    win?.webContents.send("init", { testFile, screenshotMode, demoMode });
   });
 
   await win.loadFile(path.join(__dirname, "..", "src", "renderer", "index.html"));
+
+  // Bring window to front so screen recordings capture it
+  app.focus({ steal: true });
+  win.focus();
 
   // Screenshot capture: wait 4 s for fixture content to render, then capture + quit
   if (screenshotMode) {
@@ -60,14 +75,17 @@ async function createWindow() {
       }
     }, 4000);
   }
+  // demo-mode: no auto-quit timer — renderer closes via window.close() after playback
 }
 
 app.whenReady().then(() => {
   const screenshotMode = getScreenshotMode();
+  const demoMode = getDemoMode();
+  const themeMode = screenshotMode || demoMode;
   // Force theme BEFORE window creation
-  if (screenshotMode === "light") {
+  if (themeMode === "light") {
     nativeTheme.themeSource = "light";
-  } else if (screenshotMode === "dark") {
+  } else if (themeMode === "dark") {
     nativeTheme.themeSource = "dark";
   }
   createWindow();

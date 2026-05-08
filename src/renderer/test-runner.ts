@@ -2,7 +2,7 @@
 
 const SAMPLE_RATE = 16000;
 const CHUNK_SECONDS = 3.0;
-const PLAYBACK_SPEED = 2.0;  // 2x for faster benchmark turnaround
+const DEFAULT_PLAYBACK_SPEED = 2.0;  // 2x for faster benchmark turnaround
 
 function parseWav(buf: ArrayBuffer): { samples: Int16Array; sampleRate: number } {
   const dv = new DataView(buf);
@@ -20,7 +20,11 @@ function parseWav(buf: ArrayBuffer): { samples: Int16Array; sampleRate: number }
   return { samples, sampleRate };
 }
 
-export async function streamWavFile(path: string, send: (chunk: ArrayBuffer) => void): Promise<void> {
+export async function streamWavFile(
+  path: string,
+  send: (chunk: ArrayBuffer) => void,
+  playbackSpeed: number = DEFAULT_PLAYBACK_SPEED,
+): Promise<void> {
   const data: any = await window.cairn.readFile(path);  // Buffer (Node) -> Uint8Array
   const ab: ArrayBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
   const { samples, sampleRate } = parseWav(ab);
@@ -34,6 +38,6 @@ export async function streamWavFile(path: string, send: (chunk: ArrayBuffer) => 
     const out = new ArrayBuffer(slice.length * 2);
     new Int16Array(out).set(slice);
     send(out);
-    await new Promise(r => setTimeout(r, (CHUNK_SECONDS * 1000) / PLAYBACK_SPEED));
+    await new Promise(r => setTimeout(r, (CHUNK_SECONDS * 1000) / playbackSpeed));
   }
 }
