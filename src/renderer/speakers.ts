@@ -14,6 +14,8 @@ export class SpeakersPanel {
 
   get(id: string): Speaker { return this.speakers.get(id) ?? { id, name: null, color: "#8b949e" }; }
 
+  reset() { this.speakers.clear(); this.render(); }
+
   rename(id: string, name: string) {
     const s = this.speakers.get(id); if (!s) return;
     s.name = name; this.onChange(s); this.render();
