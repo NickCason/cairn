@@ -10,10 +10,19 @@ declare global { interface Window { cairn: {
   saveSession:(name:string, events:any[])=>Promise<string>;
 } } }
 
-const transcript = new TranscriptView(document.getElementById("transcript-lines")!);
 const speakers = new SpeakersPanel(document.getElementById("speakers")!, (s) => {
   transcript.applySpeaker(s.id, s.name, s.color);
   ws?.rename(s.id, s.name ?? s.id, s.color);
+});
+const transcript = new TranscriptView(document.getElementById("transcript-lines")!, {
+  onTextEdit: (seq, text) => {
+    eventsLog.push({ type: "transcript_edit", seq, text, _recv_ts: Date.now() });
+  },
+  onSpeakerEdit: (seq, speakerId) => {
+    eventsLog.push({ type: "transcript_edit", seq, speaker_id: speakerId, _recv_ts: Date.now() });
+  },
+  listSpeakers: () => speakers.list(),
+  createSpeaker: () => speakers.createManual(),
 });
 
 const $status = document.getElementById("status")!;

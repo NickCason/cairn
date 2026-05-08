@@ -56,7 +56,22 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 .line { margin-bottom: 8px; line-height: 1.5; font-size: 13px; }
 .line .spk { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px;
              font-weight: 600; margin-right: 6px; vertical-align: 2px; }
+.line .spk.clickable { cursor: pointer; }
+.line .spk.clickable:hover { outline: 1px solid var(--border); outline-offset: 1px; }
+.line .text.editable { cursor: text; border-radius: 2px; padding: 0 2px; }
+.line .text.editable:hover { background: var(--pane-bg-2); }
+.line .text.editing { background: var(--pane-bg-2); outline: 1px solid var(--accent); padding: 0 4px;
+                      cursor: text; white-space: pre-wrap; }
 .line.partial .text { color: var(--muted); font-style: italic; }
+
+.cairn-spk-menu { background: var(--pane-bg); border: 1px solid var(--border); border-radius: 6px;
+                  box-shadow: 0 6px 20px rgba(0,0,0,0.25); padding: 4px; min-width: 140px;
+                  display: flex; flex-direction: column; gap: 2px; z-index: 1000; }
+.cairn-spk-menu .spk-opt { background: transparent; border: none; padding: 6px 10px; border-radius: 4px;
+                           text-align: left; cursor: pointer; font: inherit; color: var(--fg); }
+.cairn-spk-menu .spk-opt:hover { background: var(--pane-bg-2); }
+.cairn-spk-menu .spk-opt.new { color: var(--muted); font-style: italic; }
+.cairn-spk-menu .spk-sep { height: 1px; background: var(--border); margin: 4px 0; }
 
 .spkrow { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 5px;
           background: var(--pane-bg); border: 1px solid var(--border); margin-bottom: 4px; }

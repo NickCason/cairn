@@ -1,8 +1,11 @@
 type Speaker = { id: string; name: string|null; color: string };
 
+const PALETTE = ["#79c0ff","#e3b341","#56d364","#ff7b72","#d2a8ff","#7ee787","#ffa657","#ff9492","#a5d6ff","#f2cc60","#bc8cff"];
+
 export class SpeakersPanel {
   private speakers = new Map<string, Speaker>();
   private el: HTMLElement;
+  private nextManualIdx = 0;
   constructor(root: HTMLElement, private onChange: (s: Speaker) => void) { this.el = root; }
 
   add(id: string, color: string) {
@@ -14,7 +17,22 @@ export class SpeakersPanel {
 
   get(id: string): Speaker { return this.speakers.get(id) ?? { id, name: null, color: "#8b949e" }; }
 
-  reset() { this.speakers.clear(); this.render(); }
+  list(): Speaker[] { return Array.from(this.speakers.values()); }
+
+  // Allocate the next user-created speaker id (M1, M2, …) with a fresh palette
+  // color, register it, and return both. Server-assigned ids are S1/S2/… so the
+  // M-prefix avoids collision with future automatic ids.
+  createManual(): Speaker {
+    this.nextManualIdx += 1;
+    const id = `M${this.nextManualIdx}`;
+    const color = PALETTE[(this.speakers.size) % PALETTE.length];
+    const spk: Speaker = { id, name: null, color };
+    this.speakers.set(id, spk);
+    this.render();
+    return spk;
+  }
+
+  reset() { this.speakers.clear(); this.nextManualIdx = 0; this.render(); }
 
   rename(id: string, name: string) {
     const s = this.speakers.get(id); if (!s) return;
