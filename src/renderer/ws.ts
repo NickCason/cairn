@@ -28,6 +28,9 @@ export class CairnWS {
     this.send(msg);
   }
   stop() { this.send({ type:"stop" }); }
+  setNumSpeakers(numSpeakers: number | null) {
+    this.send({ type: "set_num_speakers", num_speakers: numSpeakers });
+  }
   rename(id: string, name: string, color: string) { this.send({ type:"speaker_rename", speaker_id:id, name, color }); }
   sendAudio(buf: ArrayBuffer) { if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(buf); }
   private send(o: any) { this.ws?.send(JSON.stringify(o)); }

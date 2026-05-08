@@ -20,8 +20,10 @@ const $status = document.getElementById("status")!;
 const $elapsed = document.getElementById("elapsed")!;
 const $recdot = document.getElementById("recdot")!;
 const $stop = document.getElementById("stopbtn")! as HTMLButtonElement;
+const $start = document.getElementById("startbtn")! as HTMLButtonElement;
 const $logo = document.getElementById("logo")!;
 const $meeting = document.getElementById("meeting")!;
+const $speakersToggle = document.getElementById("speakers-toggle")! as HTMLButtonElement;
 
 (async () => {
   const svgRes = await fetch("../icons/cairn.svg");
@@ -32,7 +34,41 @@ let ws: CairnWS | null = null;
 let started: number | null = null;
 let elapsedTimer: number | null = null;
 let meetingName = "Cairn";
-const eventsLog: any[] = [];
+let eventsLog: any[] = [];
+let stopAudio: (() => Promise<void>) | null = null;
+let demoModeActive: string | null = null;
+let isLiveMode = false;
+let isBenchmarkMode = false;
+
+// Speaker-count toggle: cycles through these values. null = auto.
+const SPEAKER_VALUES: (number | null)[] = [null, 1, 2, 3, 4, 6];
+function loadSpeakers(): number | null {
+  const saved = localStorage.getItem("cairn.numSpeakers");
+  if (saved === null) return 1; // first-launch default for live mode
+  if (saved === "auto") return null;
+  const n = parseInt(saved, 10);
+  return isNaN(n) ? null : n;
+}
+function saveSpeakers(n: number | null) {
+  localStorage.setItem("cairn.numSpeakers", n === null ? "auto" : String(n));
+}
+function speakerLabel(n: number | null): string {
+  return n === null ? "auto" : `${n} speaker${n === 1 ? "" : "s"}`;
+}
+let currentSpeakers: number | null = loadSpeakers();
+function refreshSpeakerToggleLabel() {
+  $speakersToggle.textContent = speakerLabel(currentSpeakers);
+}
+refreshSpeakerToggleLabel();
+
+$speakersToggle.onclick = () => {
+  const idx = SPEAKER_VALUES.findIndex(v => v === currentSpeakers);
+  currentSpeakers = SPEAKER_VALUES[(idx + 1) % SPEAKER_VALUES.length];
+  saveSpeakers(currentSpeakers);
+  refreshSpeakerToggleLabel();
+  // Apply immediately if a session is in progress; otherwise it'll be used on next start.
+  if (ws) ws.setNumSpeakers(currentSpeakers);
+};
 
 function onMsg(m: ServerMsg) {
   eventsLog.push({ ...m, _recv_ts: Date.now() });
@@ -51,28 +87,35 @@ function onMsg(m: ServerMsg) {
     }, 500);
     $recdot.hidden = false;
     $stop.hidden = false;
+    $stop.disabled = false;
+    $stop.textContent = "Stop";
+    $start.hidden = true;
   } else if (m.type === "ack" && m.of === "stop") {
     finalizeSession();
   }
 }
-
-let demoModeActive: string | null = null;
 
 async function finalizeSession() {
   $recdot.hidden = true;
   $stop.hidden = true;
   if (elapsedTimer) clearInterval(elapsedTimer);
   const dir = await window.cairn.saveSession(meetingName, eventsLog);
-  $status.textContent = `saved → ${dir}`;
-  // demo-mode: linger 5 s so recording captures final state; benchmark: 1.5 s
-  const dwell = demoModeActive ? 5000 : 1500;
-  setTimeout(() => window.close(), dwell);
+  $status.textContent = `saved → ${dir.split("/").slice(-1)[0]}`;
+
+  if (demoModeActive || isBenchmarkMode) {
+    // benchmark / demo: close the window so the test runner / recording can finish
+    const dwell = demoModeActive ? 5000 : 1500;
+    setTimeout(() => window.close(), dwell);
+    return;
+  }
+
+  // Live mode: keep the window open, allow restart
+  $start.hidden = false;
+  $start.disabled = false;
+  $start.textContent = "Start";
 }
 
-let stopAudio: (() => Promise<void>) | null = null;
-
 $stop.onclick = async () => {
-  // Immediate visual feedback; finalizeSession() will tidy up when ack/stop arrives.
   $stop.disabled = true;
   $stop.textContent = "stopping…";
   $recdot.hidden = true;
@@ -80,6 +123,36 @@ $stop.onclick = async () => {
   if (stopAudio) { try { await stopAudio(); } catch {} stopAudio = null; }
   ws?.stop();
 };
+
+async function startLiveSession() {
+  $start.hidden = true;
+  $status.textContent = "connecting…";
+  // Reset event log, transcript, and elapsed clock for the new session
+  eventsLog = [];
+  document.getElementById("transcript-lines")!.innerHTML = "";
+  $elapsed.textContent = "00:00:00";
+  started = null;
+  if (ws) {
+    try { ws.close(); } catch {}
+  }
+  ws = new CairnWS(CAIRN_SVC_URL, onMsg, (s) => $status.textContent = s);
+  await ws.connect();
+  ws.start(meetingName, currentSpeakers);
+
+  const { startLiveCapture } = await import("./audio.js");
+  try {
+    stopAudio = await startLiveCapture(
+      (chunk: ArrayBuffer) => ws!.sendAudio(chunk),
+      (err: Error) => { $status.textContent = `mic error: ${err.message}`; },
+    );
+  } catch (err) {
+    console.error("live capture failed:", err);
+    $status.textContent = "mic error";
+    $start.hidden = false;
+  }
+}
+
+$start.onclick = () => { startLiveSession(); };
 
 window.cairn.onInit(async ({ testFile, screenshotMode, demoMode, numSpeakers }: { testFile: string|null; screenshotMode?: string|null; demoMode?: string|null; numSpeakers?: number|null }) => {
   // Screenshot fixture mode: skip WebSocket entirely, populate with fake data
@@ -93,21 +166,27 @@ window.cairn.onInit(async ({ testFile, screenshotMode, demoMode, numSpeakers }: 
 
   if (demoMode) demoModeActive = demoMode;
 
+  // CLI override (--speakers=N or --speakers=auto) takes precedence over saved value.
+  if (numSpeakers !== undefined) {
+    currentSpeakers = numSpeakers;
+    refreshSpeakerToggleLabel();
+  }
+
+  isBenchmarkMode = !!testFile;
+  isLiveMode = !testFile;
   meetingName = testFile ? "benchmark-four-speaker" : "live";
-  // Live mode default: 1 speaker (solo dictation). Override via --speakers=N or --speakers=auto.
-  // Auto-detect tends to over-split a single voice on clean Mac audio.
-  const speakerHint = numSpeakers === undefined ? (testFile ? null : 1) : numSpeakers;
-  const speakerLabel = speakerHint === null ? "auto" : `${speakerHint}`;
+  // Benchmark default: auto (4 speakers in the WAV — pyannote auto handles it).
+  // Live default: whatever the toggle says (loadSpeakers() default = 1).
+  const speakerHint = isBenchmarkMode ? null : currentSpeakers;
   $meeting.textContent = testFile
     ? `benchmark · ${testFile.split("/").pop()}`
-    : `Cairn · ${speakerLabel} speaker${speakerHint === 1 ? "" : "s"}`;
+    : `Cairn`;
   ws = new CairnWS(CAIRN_SVC_URL, onMsg, (s) => $status.textContent = s);
   await ws.connect();
   ws.start(meetingName, speakerHint);
 
   if (testFile) {
     const { streamWavFile } = await import("./test-runner.js");
-    // demo-mode: real-time (1×); benchmark path: 2× for faster turnaround
     const speed = demoMode ? 1.0 : 2.0;
     await streamWavFile(testFile, (buf: ArrayBuffer) => ws!.sendAudio(buf), speed);
     setTimeout(() => ws?.stop(), 6000);
