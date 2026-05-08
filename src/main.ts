@@ -26,6 +26,16 @@ function getDemoMode(): "light" | "dark" | null {
   return null;
 }
 
+// Parse CLI: --speakers=<N|auto>. Default behavior decided by renderer (1 in live, null in benchmark).
+function getNumSpeakers(): number | null | undefined {
+  const arg = process.argv.find(a => a.startsWith("--speakers="));
+  if (!arg) return undefined;
+  const val = arg.split("=", 2)[1];
+  if (val === "auto") return null;
+  const n = parseInt(val, 10);
+  return isNaN(n) || n < 1 ? undefined : n;
+}
+
 let win: BrowserWindow | null = null;
 
 async function createWindow() {
@@ -47,8 +57,9 @@ async function createWindow() {
 
   // Register did-finish-load BEFORE loadFile so the event is never missed.
   const testFile = getTestFile();
+  const numSpeakers = getNumSpeakers();
   win.webContents.on("did-finish-load", () => {
-    win?.webContents.send("init", { testFile, screenshotMode, demoMode });
+    win?.webContents.send("init", { testFile, screenshotMode, demoMode, numSpeakers });
   });
 
   await win.loadFile(path.join(__dirname, "..", "src", "renderer", "index.html"));

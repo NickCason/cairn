@@ -72,11 +72,16 @@ async function finalizeSession() {
 let stopAudio: (() => Promise<void>) | null = null;
 
 $stop.onclick = async () => {
+  // Immediate visual feedback; finalizeSession() will tidy up when ack/stop arrives.
+  $stop.disabled = true;
+  $stop.textContent = "stopping…";
+  $recdot.hidden = true;
+  $status.textContent = "stopping";
   if (stopAudio) { try { await stopAudio(); } catch {} stopAudio = null; }
   ws?.stop();
 };
 
-window.cairn.onInit(async ({ testFile, screenshotMode, demoMode }: { testFile: string|null; screenshotMode?: string|null; demoMode?: string|null }) => {
+window.cairn.onInit(async ({ testFile, screenshotMode, demoMode, numSpeakers }: { testFile: string|null; screenshotMode?: string|null; demoMode?: string|null; numSpeakers?: number|null }) => {
   // Screenshot fixture mode: skip WebSocket entirely, populate with fake data
   if (screenshotMode) {
     meetingName = "vendor-sync";
@@ -89,11 +94,16 @@ window.cairn.onInit(async ({ testFile, screenshotMode, demoMode }: { testFile: s
   if (demoMode) demoModeActive = demoMode;
 
   meetingName = testFile ? "benchmark-four-speaker" : "live";
-  $meeting.textContent = testFile ? `benchmark · ${testFile.split("/").pop()}` : "Cairn";
+  // Live mode default: 1 speaker (solo dictation). Override via --speakers=N or --speakers=auto.
+  // Auto-detect tends to over-split a single voice on clean Mac audio.
+  const speakerHint = numSpeakers === undefined ? (testFile ? null : 1) : numSpeakers;
+  const speakerLabel = speakerHint === null ? "auto" : `${speakerHint}`;
+  $meeting.textContent = testFile
+    ? `benchmark · ${testFile.split("/").pop()}`
+    : `Cairn · ${speakerLabel} speaker${speakerHint === 1 ? "" : "s"}`;
   ws = new CairnWS(CAIRN_SVC_URL, onMsg, (s) => $status.textContent = s);
   await ws.connect();
-  // No num_speakers hint — let pyannote auto-detect speaker count
-  ws.start(meetingName);
+  ws.start(meetingName, speakerHint);
 
   if (testFile) {
     const { streamWavFile } = await import("./test-runner.js");

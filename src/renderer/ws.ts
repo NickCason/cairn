@@ -22,7 +22,11 @@ export class CairnWS {
       };
     });
   }
-  start(meetingName: string, numSpeakers?: number) { this.send({ type:"start", meeting_name: meetingName, source: "aggregate", ...(numSpeakers ? { num_speakers: numSpeakers } : {}) }); }
+  start(meetingName: string, numSpeakers?: number | null) {
+    const msg: any = { type: "start", meeting_name: meetingName, source: "aggregate" };
+    if (numSpeakers && numSpeakers > 0) msg.num_speakers = numSpeakers;
+    this.send(msg);
+  }
   stop() { this.send({ type:"stop" }); }
   rename(id: string, name: string, color: string) { this.send({ type:"speaker_rename", speaker_id:id, name, color }); }
   sendAudio(buf: ArrayBuffer) { if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(buf); }
