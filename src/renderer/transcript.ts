@@ -84,7 +84,10 @@ export class TranscriptView {
     // streaming misattributions can make two different speakers' utterances
     // both appear as the same id; without timing, they'd glue into a single
     // overhung row that survives even after the auth pass relabels it.
-    const MAX_COALESCE_GAP_MS = 600;
+    // 300ms is short enough to still glue a real mid-utterance pause
+    // but tight enough that brief cross-speaker insertions (Lex saying
+    // "exactly" mid-Dario, etc.) are far less likely to merge.
+    const MAX_COALESCE_GAP_MS = 300;
     const gapMs = this.lastFinalEndMs == null ? Infinity : m.t_start_ms - this.lastFinalEndMs;
     if (
       this.lastFinalRow &&
