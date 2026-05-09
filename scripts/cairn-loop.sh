@@ -119,20 +119,40 @@ sleep "$DURATION"
 log "POST /control/stop"
 curl -fsS -X POST "$CTRL/control/stop" > "$OUT/stop-resp.json"
 
-# 9. Wait for state == stopped.
-log "waiting for state=stopped (max 90s)"
-deadline=$((SECONDS + 90))
+# 9. Wait for state == stopped (long sessions need the on-stop auth pass to
+#    complete; that's typically ~30s/min of accumulated session).
+STOP_WAIT_S="${STOP_WAIT_S:-900}"
+log "waiting for state=stopped (max ${STOP_WAIT_S}s)"
+deadline=$((SECONDS + STOP_WAIT_S))
 while :; do
   STATE="$(curl -fsS "$CTRL/control/status" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("state",""))')"
   if [[ "$STATE" == "stopped" ]]; then
     log "state=stopped"
     break
   fi
-  (( SECONDS < deadline )) || { log "WARN: did not reach stopped state in 90s (current=$STATE)"; break; }
-  sleep 1
+  (( SECONDS < deadline )) || { log "WARN: did not reach stopped state in ${STOP_WAIT_S}s (current=$STATE)"; break; }
+  sleep 2
 done
 
-# 9. Snapshot transcript.
+# 9.5 Wait for final_summary to land in the saved transcript.jsonl. The
+# server emits it after the LLM finishes; the renderer writes it to the
+# session dir. Poll the most-recent session's transcript.jsonl for the
+# final_summary line.
+SESS_DIR="$(curl -fsS "$CTRL/control/status" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("session_dir",""))')"
+if [[ -n "$SESS_DIR" && -d "$SESS_DIR" ]]; then
+  log "waiting for final_summary in $SESS_DIR/transcript.jsonl (max 300s)"
+  deadline=$((SECONDS + 300))
+  until grep -q '"type":"final_summary"' "$SESS_DIR/transcript.jsonl" 2>/dev/null; do
+    (( SECONDS < deadline )) || { log "WARN: final_summary not seen in 300s; continuing"; break; }
+    sleep 2
+  done
+  if grep -q '"type":"final_summary"' "$SESS_DIR/transcript.jsonl" 2>/dev/null; then
+    log "final_summary present"
+  fi
+  cp "$SESS_DIR/transcript.jsonl" "$OUT/session.jsonl" 2>/dev/null || true
+fi
+
+# 10. Snapshot transcript.
 log "snapshotting transcript"
 curl -fsS "$CTRL/control/transcript" > "$OUT/transcript.json"
 
