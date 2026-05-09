@@ -157,6 +157,10 @@ function onMsg(m: ServerMsg) {
     handleRollingReplace(m as any);
   } else if (m.type === "final_summary") {
     handleFinalSummary(m as any);
+  } else if (m.type === "speaker_merge") {
+    const dstSpeaker = speakers.get(m.dst);
+    speakers.merge(m.src, m.dst);
+    transcript.mergeSpeakers(m.src, m.dst, dstSpeaker.name, dstSpeaker.color);
   } else if (m.type === "ack" && m.of === "start") {
     started = Date.now();
     elapsedTimer = window.setInterval(() => {
