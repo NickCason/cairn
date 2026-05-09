@@ -24,18 +24,20 @@ class CairnPCMProcessor extends AudioWorkletProcessor {
   process(inputs) {
     const input = inputs[0];
     if (!input || !input[0]) return true;
-    const ch = input[0]; // mono — first channel only
+    const channels = input;
+    const len = input[0].length;
+    const nch = channels.length;
 
-    // Walk the source samples at this.ratio increments, picking nearest-neighbor.
-    while (this.acc < ch.length) {
+    while (this.acc < len) {
       const idx = Math.floor(this.acc);
-      const s = Math.max(-1, Math.min(1, ch[idx]));
+      let sum = 0;
+      for (let c = 0; c < nch; c++) sum += channels[c][idx];
+      const s = Math.max(-1, Math.min(1, sum / nch));
       this.buffer[this.bufferIdx++] = (s * 32767) | 0;
       if (this.bufferIdx >= this.chunkSamples) this.flush();
       this.acc += this.ratio;
     }
-    // Carry remainder into the next process() call.
-    this.acc -= ch.length;
+    this.acc -= len;
     return true;
   }
 }

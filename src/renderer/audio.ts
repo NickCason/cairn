@@ -13,7 +13,6 @@ export async function startLiveCapture(
       echoCancellation: false,
       noiseSuppression: false,
       autoGainControl: false,
-      channelCount: 1,
     };
     if (deviceId && deviceId !== "default") {
       audioConstraints.deviceId = { exact: deviceId };
