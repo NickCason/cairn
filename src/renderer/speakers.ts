@@ -43,6 +43,23 @@ export class SpeakersPanel {
     s.color = color; this.onChange(s); this.render();
   }
 
+  /**
+   * Absorb srcId's panel entry into dstId. dst keeps its current name and color
+   * (dst-wins); src is removed from the panel. No-op if srcId is unknown or if
+   * src === dst.
+   */
+  merge(srcId: string, dstId: string) {
+    if (srcId === dstId) return;
+    if (!this.speakers.has(srcId)) return;
+    // Ensure dst exists; if not, mirror src onto dst before deleting.
+    if (!this.speakers.has(dstId)) {
+      const src = this.speakers.get(srcId)!;
+      this.speakers.set(dstId, { id: dstId, name: src.name, color: src.color });
+    }
+    this.speakers.delete(srcId);
+    this.render();
+  }
+
   private render() {
     this.el.innerHTML = "";
     for (const s of this.speakers.values()) {
