@@ -1,25 +1,38 @@
 #!/usr/bin/env python3
-"""grade-transcript.py — score a Cairn transcript for cross-speaker bleed.
+"""grade-transcript.py — score a Cairn transcript for cross-speaker bleed
+and speaker-attribution accuracy, using word-level alignment when words
+are present in the snapshot, falling back to time-overlap otherwise.
 
 Usage:
     grade-transcript.py --transcript run.json --reference dario-reference.json --out grade.json
 
-Algorithm:
-  - Convert reference entries to absolute Cairn-timeline ms (subtract
-    anchor_sec).
-  - For each Cairn final, compute the set of distinct reference speakers
-    whose entries overlap the final by > MIN_OVERLAP_MS.
-  - "off-script" if no reference overlap; excluded from the bleed-rate
-    denominator.
-  - "gradeable" otherwise; "bleed" if >= 2 distinct reference speakers.
-  - bleed_rate = bleed_finals / gradeable_finals (0.0 if gradeable == 0).
+Word-level algorithm (preferred):
+  - For each Cairn final, look up each word's t_start_ms in the reference's
+    [t_start_ms, t_end_ms) partition and assign that word a ground-truth
+    speaker.
+  - A final is "bleed" if its words map to >= 2 distinct ground-truth
+    speakers (after a small noise-tolerance threshold to allow a single
+    misaligned word at the boundary).
+  - Speaker accuracy is the per-word fraction whose Cairn-attributed
+    speaker (mapped via inferred Cairn-id → ref-speaker majority) matches
+    the word's ground-truth speaker.
+
+Time-only fallback (when words missing from snapshot):
+  - Per-final overlap with reference entries; bleed if >= 2 ref speakers
+    overlap by > MIN_OVERLAP_MS.
 """
 import argparse
 import json
 import sys
+from collections import Counter, defaultdict
 from pathlib import Path
 
 MIN_OVERLAP_MS = 50
+# Minority-speaker words must be at least this many AND total this duration
+# to flag a final as bleed. Default flags any cross-speaker presence; raise
+# via flags if you want to ignore single-word boundary artifacts.
+WORD_BLEED_MIN_MINORITY = 1
+WORD_BLEED_MIN_DURATION_MS = 0
 
 
 def load_transcript(path: str) -> list[dict]:
@@ -41,20 +54,158 @@ def overlap_ms(a_start, a_end, b_start, b_end) -> int:
     return max(0, min(a_end, b_end) - max(a_start, b_start))
 
 
-def grade(transcript: list[dict], reference: dict) -> dict:
+def normalize_reference(reference: dict) -> list[dict]:
+    """Convert reference entries to absolute Cairn-timeline ms (subtract
+    anchor_sec)."""
     anchor_ms = int(reference.get("anchor_sec", 0) * 1000)
-    ref_entries = []
+    out = []
     for e in reference["entries"]:
-        ref_entries.append({
+        out.append({
             "speaker": e["speaker"],
             "t_start_ms": int(e["t_start_sec"] * 1000) - anchor_ms,
             "t_end_ms": int(e["t_end_sec"] * 1000) - anchor_ms,
         })
+    out.sort(key=lambda e: e["t_start_ms"])
+    return out
 
+
+def ref_speaker_for_time(t_ms: int, ref_entries: list[dict]) -> str | None:
+    """Find the reference speaker whose [t_start_ms, t_end_ms) range
+    contains t_ms. Returns None if t_ms is outside all ranges."""
+    for e in ref_entries:
+        if e["t_start_ms"] <= t_ms < e["t_end_ms"]:
+            return e["speaker"]
+    return None
+
+
+def grade_word_level(transcript: list[dict], ref_entries: list[dict]) -> dict:
+    """Word-level grading. Requires `words` field on each Cairn final."""
+    bleed_finals: list[dict] = []
+    gradeable_finals = 0
+    off_script_finals = 0
+    word_total = 0
+    word_off_script = 0
+    word_speakers: list[tuple[str, str]] = []  # (cairn_speaker_id, ref_speaker)
+
+    for f in transcript:
+        if "type" in f and f["type"] != "transcript_final":
+            continue
+        words = f.get("words")
+        if not words:
+            continue
+        # Use word midpoint as the lookup time; less brittle than start-only.
+        per_word_speakers: list[str | None] = []
+        for w in words:
+            mid = (int(w["t_start_ms"]) + int(w["t_end_ms"])) // 2
+            per_word_speakers.append(ref_speaker_for_time(mid, ref_entries))
+        known = [s for s in per_word_speakers if s is not None]
+        word_total += len(words)
+        word_off_script += sum(1 for s in per_word_speakers if s is None)
+        if not known:
+            off_script_finals += 1
+            continue
+        gradeable_finals += 1
+        # Count distinct ref speakers in this final, optionally filtering
+        # out single-word boundary jitter via thresholds.
+        sp_count = Counter(known)
+        majority = sp_count.most_common(1)[0][0]
+        minority_count = sum(c for s, c in sp_count.items() if s != majority)
+        # Compute total duration of minority-speaker words.
+        minority_dur = 0
+        for w, sp in zip(words, per_word_speakers):
+            if sp is not None and sp != majority:
+                minority_dur += int(w["t_end_ms"]) - int(w["t_start_ms"])
+        is_bleed = (
+            len(sp_count) >= 2
+            and minority_count >= WORD_BLEED_MIN_MINORITY
+            and minority_dur >= WORD_BLEED_MIN_DURATION_MS
+        )
+        if is_bleed:
+            bleed_finals.append({
+                "seq": f.get("seq"),
+                "text": f.get("text"),
+                "cairn_speaker": f.get("speaker_id"),
+                "ref_speakers": sorted(sp_count.keys()),
+                "ref_speaker_breakdown": dict(sp_count),
+                "t_start_ms": f.get("t_start_ms"),
+                "t_end_ms": f.get("t_end_ms"),
+            })
+        # Accumulate per-word (cairn_speaker, ref_speaker) for accuracy.
+        cs = f.get("speaker_id", "")
+        for s in known:
+            word_speakers.append((cs, s))
+
+    # Infer Cairn-speaker → ref-speaker mapping by majority vote on words.
+    cs_to_ref = defaultdict(Counter)
+    for cs, rs in word_speakers:
+        cs_to_ref[cs][rs] += 1
+    mapping: dict[str, str] = {
+        cs: votes.most_common(1)[0][0] for cs, votes in cs_to_ref.items()
+    }
+
+    # Word-level accuracy: per word, does Cairn's mapped speaker match the
+    # word's ground-truth speaker?
+    correct = 0
+    incorrect = 0
+    misattributions: list[dict] = []
+    for f in transcript:
+        if "type" in f and f["type"] != "transcript_final":
+            continue
+        words = f.get("words")
+        if not words:
+            continue
+        cs = f.get("speaker_id", "")
+        expected = mapping.get(cs, cs)
+        per_word_correct = 0
+        per_word_incorrect = 0
+        for w in words:
+            mid = (int(w["t_start_ms"]) + int(w["t_end_ms"])) // 2
+            actual = ref_speaker_for_time(mid, ref_entries)
+            if actual is None:
+                continue
+            if actual == expected:
+                correct += 1
+                per_word_correct += 1
+            else:
+                incorrect += 1
+                per_word_incorrect += 1
+        if per_word_incorrect > 0 and per_word_incorrect >= per_word_correct:
+            # The MAJORITY of words in this final disagree with the
+            # row's attribution — likely a true misattribution.
+            misattributions.append({
+                "seq": f.get("seq"),
+                "cairn_speaker": cs,
+                "mapped_to": expected,
+                "correct_words": per_word_correct,
+                "wrong_words": per_word_incorrect,
+                "text": f.get("text"),
+            })
+
+    word_accuracy = correct / (correct + incorrect) if (correct + incorrect) else 0.0
+
+    return {
+        "summary": {
+            "mode": "word-level",
+            "total_finals": len(transcript),
+            "gradeable_finals": gradeable_finals,
+            "bleed_finals": len(bleed_finals),
+            "off_script_finals": off_script_finals,
+            "bleed_rate": round(len(bleed_finals) / gradeable_finals if gradeable_finals else 0.0, 4),
+            "word_total": word_total,
+            "word_off_script": word_off_script,
+            "word_accuracy": round(word_accuracy, 4),
+            "speaker_mapping": mapping,
+        },
+        "bleeds": bleed_finals,
+        "misattributions": misattributions,
+    }
+
+
+def grade_time_only(transcript: list[dict], ref_entries: list[dict]) -> dict:
+    """Fallback: per-final time overlap (legacy)."""
     bleed_finals: list[dict] = []
     gradeable = 0
     off_script = 0
-
     for f in transcript:
         if "type" in f and f["type"] != "transcript_final":
             continue
@@ -77,20 +228,29 @@ def grade(transcript: list[dict], reference: dict) -> dict:
                 "t_start_ms": t0,
                 "t_end_ms": t1,
             })
-
-    bleed_count = len(bleed_finals)
-    bleed_rate = (bleed_count / gradeable) if gradeable else 0.0
-
     return {
         "summary": {
+            "mode": "time-only",
             "total_finals": len(transcript),
             "gradeable_finals": gradeable,
-            "bleed_finals": bleed_count,
+            "bleed_finals": len(bleed_finals),
             "off_script_finals": off_script,
-            "bleed_rate": round(bleed_rate, 4),
+            "bleed_rate": round(len(bleed_finals) / gradeable if gradeable else 0.0, 4),
         },
         "bleeds": bleed_finals,
     }
+
+
+def grade(transcript: list[dict], reference: dict) -> dict:
+    ref_entries = normalize_reference(reference)
+    has_words = any(
+        bool(f.get("words"))
+        for f in transcript
+        if "type" not in f or f.get("type") == "transcript_final"
+    )
+    if has_words:
+        return grade_word_level(transcript, ref_entries)
+    return grade_time_only(transcript, ref_entries)
 
 
 def main() -> int:
@@ -106,11 +266,21 @@ def main() -> int:
     Path(args.out).write_text(json.dumps(result, indent=2))
 
     s = result["summary"]
-    print(
-        f"Bleed rate: {s['bleed_rate'] * 100:.1f}% "
-        f"({s['bleed_finals']}/{s['gradeable_finals']} gradeable); "
-        f"off-script: {s['off_script_finals']}; total: {s['total_finals']}"
-    )
+    if s["mode"] == "word-level":
+        print(
+            f"[word-level] Bleed: {s['bleed_finals']}/{s['gradeable_finals']} = "
+            f"{s['bleed_rate'] * 100:.1f}%; "
+            f"Speaker accuracy: {s['word_accuracy'] * 100:.1f}% "
+            f"({s['word_total'] - s['word_off_script']} on-script words); "
+            f"off-script finals: {s['off_script_finals']}; "
+            f"mapping: {s['speaker_mapping']}"
+        )
+    else:
+        print(
+            f"[time-only] Bleed rate: {s['bleed_rate'] * 100:.1f}% "
+            f"({s['bleed_finals']}/{s['gradeable_finals']} gradeable); "
+            f"off-script: {s['off_script_finals']}; total: {s['total_finals']}"
+        )
     return 0
 
 
