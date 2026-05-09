@@ -158,7 +158,7 @@ All env-controllable on cairn-svc, with documented defaults in `.env.example`:
 | `CAIRN_DIAR_MERGE_COS` | `0.82` | Cosine threshold for the merge sweep |
 | `CAIRN_DIAR_MERGE_MIN_S` | `8.0` | Min total speech per id to be eligible for merge |
 
-Defaults are conservative starting points. Pyannote's embedding space (192-d, ECAPA-style) typically separates same-speaker pairs (≥ 0.75) from different-speaker pairs (≤ 0.65) once centroids have ~10 s of speech. Tune on `benchmarks/`.
+Defaults are conservative starting points. Pyannote 3.1's embedding space (256-d, WeSpeaker ResNet34) typically separates same-speaker pairs (≥ 0.75) from different-speaker pairs (≤ 0.65) once centroids have ~10 s of speech; the heuristic was originally calibrated for ECAPA-style 192-d embeddings and behaves similarly here. Tune on `benchmarks/`.
 
 ## Error handling
 
@@ -201,6 +201,6 @@ Defaults are conservative starting points. Pyannote's embedding space (192-d, EC
 |---|---|
 | Cosine thresholds too tight → over-splitting persists | Tune on `benchmarks/`. Defaults err toward over-splitting (safer than over-merging); merge sweep cleans up. |
 | Cosine thresholds too loose → false unification (two voices merged) | `MERGE_COS = 0.82` is conservative. `MERGE_MIN_S = 8 s` blocks early instability. False merges from the user's POV are worse than over-splits, so threshold defaults bias safe. |
-| Pyannote embeddings inaccessible from current pipeline call | Pre-implementation: spike `diarize.py` to confirm pipeline hook exposes embeddings. If it doesn't, run `pyannote/embedding` as a separate pass on each segment (~50 ms per segment on this CPU) — adds latency budget but not risk. <br>Verified 2026-05-08 on node4 (`pyannote/speaker-diarization-3.1`): `pipeline(path, return_embeddings=True)` returns `(diarization, embeddings)` where `embeddings` is an `np.ndarray` of shape `(N_speakers, 256)`, `dtype=float32` (empty case is `(0, 256)` `float64`), with row `i` corresponding to `list(diarization.labels())[i]`. |
+| Pyannote embeddings inaccessible from current pipeline call | Pre-implementation: spike `diarize.py` to confirm pipeline hook exposes embeddings. If it doesn't, run `pyannote/embedding` as a separate pass on each segment (~50 ms per segment on this CPU) — adds latency budget but not risk. <br>Verified 2026-05-08 on node4 (`pyannote/speaker-diarization-3.1`): `pipeline(path, return_embeddings=True)` returns `(diarization, embeddings)` where `embeddings` is an `np.ndarray` of shape `(N_speakers, 256)`, `dtype=float32` (empty case is `(0, 256)` `float64`), with row `i` corresponding to sorted `list(diarization.labels())[i]`. |
 | Centroid drift across very long meetings | `CENTROID_TOTAL_CAP_S = 600` keeps EMA responsive late-session. |
 | Name-conflict edge case after merge ("Bob" absorbed into unrenamed "S1") | dst-wins for v1; revisit with banner UX if it bites. |
