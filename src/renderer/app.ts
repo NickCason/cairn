@@ -1,4 +1,4 @@
-import { CairnWS, TranscriptFinal, TranscriptPartial, SpeakerAssigned, ServerMsg } from "./ws.js";
+import { CairnWS, TranscriptFinal, TranscriptPartial, SpeakerAssigned, ServerMsg, TranscriptSplitMsg } from "./ws.js";
 import { TranscriptView } from "./transcript.js";
 import { SpeakersPanel } from "./speakers.js";
 import { handleRollingSummary, handleRollingReplace, handleFinalSummary } from "./summary.js";
@@ -133,6 +133,9 @@ function onMsg(m: ServerMsg) {
   } else if (m.type === "speaker_relabel") {
     const dst = speakers.get(m.speaker_id);
     transcript.relabelLine(m.seq, m.speaker_id, dst.name, dst.color);
+  } else if (m.type === "transcript_split") {
+    const msg = m as TranscriptSplitMsg;
+    transcript.splitLine(msg.original_seq, msg.rows, (id) => speakers.get(id));
   } else if (m.type === "ack" && m.of === "start") {
     started = Date.now();
     elapsedTimer = window.setInterval(() => {

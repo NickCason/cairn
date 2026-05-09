@@ -1,4 +1,4 @@
-import type { TranscriptPartial, TranscriptFinal } from "./ws";
+import type { TranscriptPartial, TranscriptFinal, SplitRow } from "./ws";
 
 type SpeakerInfo = { id: string; name: string|null; color: string };
 
@@ -140,6 +140,60 @@ export class TranscriptView {
     spk.textContent = dstName ?? dstId;
     if (this.lastFinalSpeaker === prevId) {
       this.lastFinalSpeaker = dstId;
+    }
+  }
+
+  /**
+   * Replace the text content of an existing finalized row identified by seq.
+   * Used by splitLine to update rows[0] in place after relabeling.
+   */
+  private updateLineText(seq: number, text: string): void {
+    const row = this.bySeq.get(seq);
+    if (!row) return;
+    const textEl = row.querySelector<HTMLElement>(".text");
+    if (!textEl) return;
+    textEl.textContent = text;
+  }
+
+  /**
+   * Handle a transcript_split message: mutate the existing row at originalSeq
+   * to reflect rows[0], then insert rows[1:] as new finalized rows immediately
+   * after it in the DOM.
+   *
+   * getSpeaker resolves a speaker_id to its rendered { name, color } — callers
+   * pass speakers.get(id) from the SpeakersPanel, matching the relabelLine
+   * convention used in app.ts.
+   */
+  splitLine(
+    originalSeq: number,
+    rows: SplitRow[],
+    getSpeaker: (id: string) => { name: string | null; color: string },
+  ): void {
+    if (rows.length === 0) return;
+
+    const first = rows[0];
+    const firstSpeaker = getSpeaker(first.speaker_id);
+    // Mutate the existing row: relabel speaker, then update text.
+    this.relabelLine(originalSeq, first.speaker_id, firstSpeaker.name, firstSpeaker.color);
+    this.updateLineText(originalSeq, first.text);
+
+    // Insert rows[1:] as new finalized rows immediately after originalSeq's DOM node.
+    const anchorRow = this.bySeq.get(originalSeq);
+    let insertAfter: HTMLElement | null = anchorRow ?? null;
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      const sp = getSpeaker(r.speaker_id);
+      const newRow = this.createRow("line", r.seq, /*finalized=*/true);
+      this.assignRowSpeakerVisuals(newRow, r.speaker_id, sp.name, sp.color);
+      newRow.querySelector<HTMLElement>(".text")!.textContent = r.text;
+      this.attachSpeakerClick(newRow, r.seq);
+      // Insert directly after the previous row (anchor or last inserted).
+      if (insertAfter && insertAfter.parentNode === this.el) {
+        insertAfter.insertAdjacentElement("afterend", newRow);
+      } else {
+        this.el.appendChild(newRow);
+      }
+      insertAfter = newRow;
     }
   }
 

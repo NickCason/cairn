@@ -8,7 +8,22 @@ export type ErrorMsg = { type:"error"; code:string; message:string };
 export type RollingSummaryMsg = { type:"rolling_summary"; idx:number; window_start_s:number; window_end_s:number; bullets:string[]; generated_at:number; merged_from_failed_prior:boolean };
 export type RollingReplaceMsg = { type:"rolling_summary_replace"; idx:number; bullets:string[]; generated_at:number; reason:string };
 export type FinalSummaryMsg = { type:"final_summary"; ok:boolean; [key:string]:unknown };
-export type ServerMsg = TranscriptPartial | TranscriptFinal | SpeakerAssigned | SpeakerMerge | SpeakerRelabel | Ack | ErrorMsg | RollingSummaryMsg | RollingReplaceMsg | FinalSummaryMsg;
+
+export interface SplitRow {
+  seq: number;
+  text: string;
+  speaker_id: string;
+  t_start_ms: number;
+  t_end_ms: number;
+}
+
+export interface TranscriptSplitMsg {
+  type: "transcript_split";
+  original_seq: number;
+  rows: SplitRow[];
+}
+
+export type ServerMsg = TranscriptPartial | TranscriptFinal | SpeakerAssigned | SpeakerMerge | SpeakerRelabel | Ack | ErrorMsg | RollingSummaryMsg | RollingReplaceMsg | FinalSummaryMsg | TranscriptSplitMsg;
 
 export class CairnWS {
   private ws: WebSocket | null = null;
