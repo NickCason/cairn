@@ -33,7 +33,6 @@ const $stop = document.getElementById("stopbtn")! as HTMLButtonElement;
 const $start = document.getElementById("startbtn")! as HTMLButtonElement;
 const $logo = document.getElementById("logo")!;
 const $meeting = document.getElementById("meeting")!;
-const $speakersToggle = document.getElementById("speakers-toggle")! as HTMLButtonElement;
 const $clear = document.getElementById("clearbtn")! as HTMLButtonElement;
 const $devicePicker = document.getElementById("device-picker")! as HTMLSelectElement;
 const $viewTranscript = document.getElementById("view-transcript") as HTMLButtonElement | null;
@@ -55,27 +54,6 @@ let stopAudio: (() => Promise<void>) | null = null;
 let demoModeActive: string | null = null;
 let isLiveMode = false;
 let isBenchmarkMode = false;
-
-// Speaker-count toggle: cycles through these values. null = auto.
-const SPEAKER_VALUES: (number | null)[] = [null, 1, 2, 3, 4, 5, 6, 8];
-function loadSpeakers(): number | null {
-  const saved = localStorage.getItem("cairn.numSpeakers");
-  if (saved === null) return 1; // first-launch default for live mode
-  if (saved === "auto") return null;
-  const n = parseInt(saved, 10);
-  return isNaN(n) ? null : n;
-}
-function saveSpeakers(n: number | null) {
-  localStorage.setItem("cairn.numSpeakers", n === null ? "auto" : String(n));
-}
-function speakerLabel(n: number | null): string {
-  return n === null ? "auto" : `${n} speaker${n === 1 ? "" : "s"}`;
-}
-let currentSpeakers: number | null = loadSpeakers();
-function refreshSpeakerToggleLabel() {
-  $speakersToggle.textContent = speakerLabel(currentSpeakers);
-}
-refreshSpeakerToggleLabel();
 
 // === Device picker ===
 function loadDeviceId(): string {
@@ -132,15 +110,6 @@ $devicePicker.onchange = async () => {
       console.error("device switch failed:", err);
     }
   }
-};
-
-$speakersToggle.onclick = () => {
-  const idx = SPEAKER_VALUES.findIndex(v => v === currentSpeakers);
-  currentSpeakers = SPEAKER_VALUES[(idx + 1) % SPEAKER_VALUES.length];
-  saveSpeakers(currentSpeakers);
-  refreshSpeakerToggleLabel();
-  // Apply immediately if a session is in progress; otherwise it'll be used on next start.
-  if (ws) ws.setNumSpeakers(currentSpeakers);
 };
 
 function onMsg(m: ServerMsg) {
@@ -257,7 +226,7 @@ async function startLiveSession() {
   }
   ws = new CairnWS(CAIRN_SVC_URL, onMsg, (s) => $status.textContent = s);
   await ws.connect();
-  ws.start(meetingName, currentSpeakers);
+  ws.start(meetingName);
 
   const { startLiveCapture } = await import("./audio.js");
   try {
@@ -286,7 +255,7 @@ $viewSummary?.addEventListener("click", () => {
   if ($finalSummary) $finalSummary.hidden = false;
 });
 
-window.cairn.onInit(async ({ testFile, screenshotMode, demoMode, numSpeakers }: { testFile: string|null; screenshotMode?: string|null; demoMode?: string|null; numSpeakers?: number|null }) => {
+window.cairn.onInit(async ({ testFile, screenshotMode, demoMode }: { testFile: string|null; screenshotMode?: string|null; demoMode?: string|null }) => {
   // Screenshot fixture mode: skip WebSocket entirely, populate with fake data
   if (screenshotMode) {
     meetingName = "vendor-sync";
@@ -298,24 +267,15 @@ window.cairn.onInit(async ({ testFile, screenshotMode, demoMode, numSpeakers }: 
 
   if (demoMode) demoModeActive = demoMode;
 
-  // CLI override (--speakers=N or --speakers=auto) takes precedence over saved value.
-  if (numSpeakers !== undefined) {
-    currentSpeakers = numSpeakers;
-    refreshSpeakerToggleLabel();
-  }
-
   isBenchmarkMode = !!testFile;
   isLiveMode = !testFile;
   meetingName = testFile ? "benchmark-four-speaker" : "live";
-  // Benchmark default: auto (4 speakers in the WAV — pyannote auto handles it).
-  // Live default: whatever the toggle says (loadSpeakers() default = 1).
-  const speakerHint = isBenchmarkMode ? null : currentSpeakers;
   $meeting.textContent = testFile
     ? `benchmark · ${testFile.split("/").pop()}`
     : `Cairn`;
   ws = new CairnWS(CAIRN_SVC_URL, onMsg, (s) => $status.textContent = s);
   await ws.connect();
-  ws.start(meetingName, speakerHint);
+  ws.start(meetingName);
 
   if (testFile) {
     const { streamWavFile } = await import("./test-runner.js");
