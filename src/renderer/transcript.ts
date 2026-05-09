@@ -1,4 +1,4 @@
-import type { TranscriptPartial, TranscriptFinal, SplitRow } from "./ws";
+import type { TranscriptPartial, TranscriptFinal, SplitRow, Word } from "./ws";
 
 type SpeakerInfo = { id: string; name: string|null; color: string };
 
@@ -36,6 +36,10 @@ function isLocked(row: HTMLElement): boolean {
 export class TranscriptView {
   private el: HTMLElement;
   private bySeq = new Map<number, HTMLElement>();
+  // Per-row word list (absolute-time TranscriptWord triples). Keyed by row
+  // element so coalesce-merge naturally reuses one entry. snapshot() reads
+  // from here for word-level grading.
+  private wordsByRow = new WeakMap<HTMLElement, Word[]>();
   private lastFinalRow: HTMLElement | null = null;
   private lastFinalSpeaker: string | null = null;
   private lastFinalEndMs: number | null = null;
@@ -71,6 +75,7 @@ export class TranscriptView {
     textEl.textContent = m.text;
     // Speaker pill is interactive only after finalization.
     this.attachSpeakerClick(row, m.seq);
+    if (m.words && m.words.length) this.wordsByRow.set(row, [...m.words]);
 
     // Same-speaker mid-sentence coalesce. Requires (a) speaker-id match,
     // (b) inter-utterance gap under MAX_COALESCE_GAP_MS (real mid-utterance
@@ -93,6 +98,11 @@ export class TranscriptView {
       if (canMergeSentence(prevText, m.text)) {
         prevTextEl.textContent = prevText.replace(/[\s,;:]+$/, "") + " " + m.text;
         this.lastFinalRow.dataset.tEndMs = String(m.t_end_ms);
+        // Append the absorbed row's words to the surviving row.
+        if (m.words && m.words.length) {
+          const prior = this.wordsByRow.get(this.lastFinalRow) ?? [];
+          this.wordsByRow.set(this.lastFinalRow, [...prior, ...m.words]);
+        }
         for (const [seq, r] of this.bySeq) {
           if (r === row) this.bySeq.set(seq, this.lastFinalRow);
         }
@@ -195,6 +205,9 @@ export class TranscriptView {
     if (existingRow) {
       existingRow.dataset.tStartMs = String(first.t_start_ms);
       existingRow.dataset.tEndMs = String(first.t_end_ms);
+      // Replace the words on the existing row with run-0's words.
+      if (first.words && first.words.length) this.wordsByRow.set(existingRow, [...first.words]);
+      else this.wordsByRow.delete(existingRow);
     }
 
     // Insert rows[1:] as new finalized rows immediately after originalSeq's DOM node.
@@ -210,6 +223,7 @@ export class TranscriptView {
       newRow.dataset.tStartMs = String(r.t_start_ms);
       newRow.dataset.tEndMs = String(r.t_end_ms);
       this.attachSpeakerClick(newRow, r.seq);
+      if (r.words && r.words.length) this.wordsByRow.set(newRow, [...r.words]);
       // Insert directly after the previous row (anchor or last inserted).
       if (insertAfter && insertAfter.parentNode === this.el) {
         insertAfter.insertAdjacentElement("afterend", newRow);
@@ -225,7 +239,7 @@ export class TranscriptView {
    * for reporting to the main process via cairnControl.reportTranscript.
    * Partial rows (no speaker yet assigned, class "partial") are omitted.
    */
-  snapshot(): Array<{ seq: number; speaker_id: string; text: string; t_start_ms: number; t_end_ms: number }> {
+  snapshot(): Array<{ seq: number; speaker_id: string; text: string; t_start_ms: number; t_end_ms: number; words: Word[] | null }> {
     // After coalesce-merge, multiple bySeq entries may point at the same DOM
     // row.  Build a map from row -> lowest seq so each row is emitted once,
     // keyed by its original (pre-merge) seq for deterministic ordering.
@@ -237,17 +251,19 @@ export class TranscriptView {
         seen.set(row, seq);
       }
     }
-    const result: Array<{ seq: number; speaker_id: string; text: string; t_start_ms: number; t_end_ms: number }> = [];
+    const result: Array<{ seq: number; speaker_id: string; text: string; t_start_ms: number; t_end_ms: number; words: Word[] | null }> = [];
     for (const [row, seq] of seen.entries()) {
       const spk = row.querySelector<HTMLElement>(".spk");
       const textEl = row.querySelector<HTMLElement>(".text");
       if (!spk || !textEl) continue;
+      const words = this.wordsByRow.get(row) ?? null;
       result.push({
         seq,
         speaker_id: spk.dataset.spk ?? "",
         text: textEl.textContent ?? "",
         t_start_ms: parseInt(row.dataset.tStartMs || "0", 10),
         t_end_ms: parseInt(row.dataset.tEndMs || "0", 10),
+        words,
       });
     }
     // Sort by seq so callers get a stable ordered array.

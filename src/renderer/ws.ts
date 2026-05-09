@@ -1,5 +1,6 @@
+export interface Word { text: string; t_start_ms: number; t_end_ms: number; }
 export type TranscriptPartial = { type:"transcript_partial"; seq:number; text:string; t_start_ms:number; t_end_ms:number };
-export type TranscriptFinal = { type:"transcript_final"; seq:number; text:string; t_start_ms:number; t_end_ms:number; speaker_id:string };
+export type TranscriptFinal = { type:"transcript_final"; seq:number; text:string; t_start_ms:number; t_end_ms:number; speaker_id:string; words?: Word[] | null };
 export type SpeakerAssigned = { type:"speaker_assigned"; speaker_id:string; color_hint:string };
 export type SpeakerMerge = { type:"speaker_merge"; src:string; dst:string };
 export type SpeakerRelabel = { type:"speaker_relabel"; seq:number; speaker_id:string };
@@ -15,6 +16,7 @@ export interface SplitRow {
   speaker_id: string;
   t_start_ms: number;
   t_end_ms: number;
+  words?: Word[] | null;
 }
 
 export interface TranscriptSplitMsg {
