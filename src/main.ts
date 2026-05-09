@@ -96,6 +96,13 @@ function startControlServer(mainWindow: BrowserWindow) {
     res.end(JSON.stringify({ ok: false, error: "not found" }));
   });
 
+  server.on("error", (err: any) => {
+    if (err && err.code === "EADDRINUSE") {
+      console.error(`[cairn] control endpoint port ${CONTROL_PORT} already in use; control disabled for this session`);
+      return;
+    }
+    console.error(`[cairn] control endpoint error:`, err);
+  });
   server.listen(CONTROL_PORT, "127.0.0.1", () => {
     console.log(`[cairn] control endpoint listening on 127.0.0.1:${CONTROL_PORT}`);
   });

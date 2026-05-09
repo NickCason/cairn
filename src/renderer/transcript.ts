@@ -226,9 +226,19 @@ export class TranscriptView {
    * Partial rows (no speaker yet assigned, class "partial") are omitted.
    */
   snapshot(): Array<{ seq: number; speaker_id: string; text: string; t_start_ms: number; t_end_ms: number }> {
-    const result: Array<{ seq: number; speaker_id: string; text: string; t_start_ms: number; t_end_ms: number }> = [];
-    for (const [seq, row] of this.bySeq) {
+    // After coalesce-merge, multiple bySeq entries may point at the same DOM
+    // row.  Build a map from row -> lowest seq so each row is emitted once,
+    // keyed by its original (pre-merge) seq for deterministic ordering.
+    const seen = new Map<HTMLElement, number>(); // row -> lowest seq pointing at it
+    for (const [seq, row] of this.bySeq.entries()) {
       if (row.classList.contains("partial")) continue;
+      const prior = seen.get(row);
+      if (prior === undefined || seq < prior) {
+        seen.set(row, seq);
+      }
+    }
+    const result: Array<{ seq: number; speaker_id: string; text: string; t_start_ms: number; t_end_ms: number }> = [];
+    for (const [row, seq] of seen.entries()) {
       const spk = row.querySelector<HTMLElement>(".spk");
       const textEl = row.querySelector<HTMLElement>(".text");
       if (!spk || !textEl) continue;
