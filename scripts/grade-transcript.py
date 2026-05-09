@@ -241,7 +241,61 @@ def grade_time_only(transcript: list[dict], ref_entries: list[dict]) -> dict:
     }
 
 
-def grade(transcript: list[dict], reference: dict) -> dict:
+def auto_calibrate_anchor(transcript: list[dict], reference: dict) -> float:
+    """Detect the per-run anchor offset between Cairn's recording-time and
+    the reference's t_start_sec timeline. Returns the anchor_sec to use.
+
+    Strategy: for each Cairn final with words, find the reference entry
+    whose first 4 words are the closest fuzzy match to the Cairn final's
+    first 4 words. The cairn t_start_ms - reference t_start_sec*1000 of
+    that pair is the offset. Take the median across pairs.
+    """
+    import re
+
+    def norm_words(s: str, n: int = 4) -> list[str]:
+        toks = [w for w in re.split(r"[^a-z0-9']+", (s or "").lower()) if w]
+        return toks[:n]
+
+    ref_entries = reference.get("entries", [])
+    pairs: list[float] = []  # offsets in seconds: cairn_time - (ref_time - anchor)
+    used_ref = set()
+    for f in transcript:
+        if "type" in f and f["type"] != "transcript_final":
+            continue
+        cw = norm_words(f.get("text", ""), 4)
+        if len(cw) < 3:
+            continue
+        cairn_t = int(f.get("t_start_ms", 0)) / 1000.0
+        # Find best-matching reference entry not already used.
+        best_score, best_idx = 0, -1
+        for i, e in enumerate(ref_entries):
+            if i in used_ref:
+                continue
+            rw = norm_words(e.get("text", ""), 4)
+            if not rw:
+                continue
+            score = sum(1 for a, b in zip(cw, rw) if a == b)
+            if score > best_score:
+                best_score = score
+                best_idx = i
+        if best_score < 3 or best_idx < 0:
+            continue
+        used_ref.add(best_idx)
+        ref_t = float(ref_entries[best_idx]["t_start_sec"])
+        # offset such that cairn_t = ref_t - anchor → anchor = ref_t - cairn_t
+        pairs.append(ref_t - cairn_t)
+        if len(pairs) >= 5:
+            break  # 5 pairs is plenty for median
+    if not pairs:
+        return float(reference.get("anchor_sec", 0))
+    pairs.sort()
+    median = pairs[len(pairs) // 2]
+    return median
+
+
+def grade(transcript: list[dict], reference: dict, anchor_sec: float | None = None) -> dict:
+    if anchor_sec is not None:
+        reference = {**reference, "anchor_sec": anchor_sec}
     ref_entries = normalize_reference(reference)
     has_words = any(
         bool(f.get("words"))
@@ -258,11 +312,22 @@ def main() -> int:
     ap.add_argument("--transcript", required=True)
     ap.add_argument("--reference", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--anchor-sec", type=float, default=None,
+                    help="Override reference anchor_sec. Default auto-calibrates by matching the first few finals to reference turns.")
+    ap.add_argument("--no-auto-anchor", action="store_true",
+                    help="Disable auto-calibration (use reference's anchor_sec verbatim).")
     args = ap.parse_args()
 
     transcript = load_transcript(args.transcript)
     reference = json.loads(Path(args.reference).read_text())
-    result = grade(transcript, reference)
+    anchor = args.anchor_sec
+    if anchor is None and not args.no_auto_anchor:
+        anchor = auto_calibrate_anchor(transcript, reference)
+        original = float(reference.get("anchor_sec", 0))
+        if abs(anchor - original) > 0.05:
+            print(f"[auto-anchor] {original:.2f} → {anchor:.2f} (drift={anchor - original:+.2f}s)",
+                  file=sys.stderr)
+    result = grade(transcript, reference, anchor_sec=anchor)
     Path(args.out).write_text(json.dumps(result, indent=2))
 
     s = result["summary"]

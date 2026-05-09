@@ -1,0 +1,333 @@
+{
+  "url": "https://lexfridman.com/dario-amodei-transcript",
+  "anchor_sec": 194,
+  "entries": [
+    {
+      "speaker": "Lex Fridman",
+      "t_start_sec": 197.8,
+      "text": "Let's start with a big idea of scaling laws and the scaling hypothesis. What is it? What is its history, and where do we stand today?",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 3.8000000000000007,
+      "_v1_t_start_sec": 194.0,
+      "_drift_sec": 3.8000000000000114,
+      "t_end_sec": 205.88
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 205.88,
+      "text": "So I can only describe it as it relates to my own experience, but I've been in the AI field for about 10 years and it was something I noticed very early on. So I first joined the AI world when I was working at Baidu with Andrew Ng in late 2014, which is almost exactly 10 years ago now. And the first thing we worked on, was speech recognition systems. And in those days I think deep learning was a new thing. It had made lots of progress, but everyone was always saying, \u201cWe don't have the algorithms we need to succeed. We are only matching a tiny fraction. There's so much we need to discover algorithmically. We haven't found the picture of how to match the human brain.\u201d",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 11.88,
+      "_v1_t_start_sec": 202.0,
+      "_drift_sec": 3.8799999999999955,
+      "t_end_sec": 250.66
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 250.66,
+      "text": "And in some ways it was fortunate, you can have almost beginner's luck. I was like a newcomer to the field. And I looked at the neural net that we were using for speech, the recurrent neural networks, and I said, \u201cI don't know, what if you make them bigger and give them more layers? And what if you scale up the data along with this?\u201d I just saw these as independent dials that you could turn. And I noticed that the models started to do better and better as you gave them more data, as you made the models larger, as you trained them for longer. And I didn't measure things precisely in those days, but along with colleagues, we very much got the informal sense that the more data and the more compute and the more training you put into these models, the better they perform.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 56.66,
+      "_v1_t_start_sec": 245.0,
+      "_drift_sec": 5.659999999999997,
+      "t_end_sec": 295.9
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 295.9,
+      "text": "And so initially my thinking was, \u201cHey, maybe that is just true for speech recognition systems. Maybe that's just one particular quirk, one particular area.\u201d I think it wasn't until 2017 when I first saw the results from GPT-1 that it clicked for me that language is probably the area in which we can do this. We can get trillions of words of language data, we can train on them. And the models we were trained in those days were tiny. You could train them on one to eight GPUs, whereas now we train jobs on tens of thousands, soon going to hundreds of thousands of GPUs.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 101.9,
+      "_v1_t_start_sec": 291.0,
+      "_drift_sec": 4.899999999999977,
+      "t_end_sec": 332.02
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 332.02,
+      "text": "And so when I saw those two things together, and there were a few people like Ilya Sudskever who you've interviewed, who had somewhat similar views. He might've been the first one, although I think a few people came to similar views around the same time, right? There was Rich Sutton's bitter lesson, Gwern wrote about the scaling hypothesis. But I think somewhere between 2014 and 2017 was when it really clicked for me, when I really got conviction that, \u201cHey, we're going to be able to these incredibly wide cognitive tasks if we just scale up the models.\u201d",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 138.02,
+      "_v1_t_start_sec": 328.0,
+      "_drift_sec": 4.019999999999982,
+      "t_end_sec": 367.34000000000003
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 367.34000000000003,
+      "text": "And at every stage of scaling, there are always arguments. And when I first heard them honestly, I thought, \u201cProbably I'm the one who's wrong and all these experts in the field are right. They know the situation better than I do, right?\u201d There's the Chomsky argument about, \u201cYou can get syntactics but you can't get semantics.\u201d There was this idea, \u201cOh, you can make a sentence make sense, but you can't make a paragraph make sense.\u201d The latest one we have today is, \u201cWe're going to run out of data, or the data isn't high quality enough or models can't reason.\u201d",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 173.34,
+      "_v1_t_start_sec": 363.0,
+      "_drift_sec": 4.340000000000032,
+      "t_end_sec": 398.18
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 398.18,
+      "text": "And each time, every time, we manage to either find a way around or scaling just is the way around. Sometimes it's one, sometimes it's the other. And so I'm now at this point, I still think it's always quite uncertain. We have nothing but inductive inference to tell us that the next two years are going to be like the last 10 years. But I've seen the movie enough times, I've seen the story happen for enough times to really believe that probably the scaling is going to continue, and that there's some magic to it that we haven't really explained on a theoretical basis yet.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 204.18,
+      "_v1_t_start_sec": 394.0,
+      "_drift_sec": 4.180000000000007,
+      "t_end_sec": 434.34000000000003
+    },
+    {
+      "speaker": "Lex Fridman",
+      "t_start_sec": 434.34000000000003,
+      "text": "And of course the scaling here is bigger networks, bigger data, bigger compute?",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 240.34,
+      "_v1_t_start_sec": 430.0,
+      "_drift_sec": 4.340000000000032,
+      "t_end_sec": 440.65999999999997
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 440.65999999999997,
+      "text": "Yes.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 246.66,
+      "_v1_t_start_sec": 436.0,
+      "_drift_sec": 4.659999999999968,
+      "t_end_sec": 441.38
+    },
+    {
+      "speaker": "Lex Fridman",
+      "t_start_sec": 441.38,
+      "text": "All of those?",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 247.38,
+      "_v1_t_start_sec": 437.0,
+      "_drift_sec": 4.3799999999999955,
+      "t_end_sec": 441.8
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 441.8,
+      "text": "In particular, linear scaling up of bigger networks, bigger training times and more and more data. So all of these things, almost like a chemical reaction, you have three ingredients in the chemical reaction and you need to linearly scale up the three ingredients. If you scale up one, not the others, you run out of the other reagents and the reaction stops. But if you scale up everything in series, then the reaction can proceed.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 247.8,
+      "_v1_t_start_sec": 437.0,
+      "_drift_sec": 4.800000000000011,
+      "t_end_sec": 469.46
+    },
+    {
+      "speaker": "Lex Fridman",
+      "t_start_sec": 469.46,
+      "text": "And of course now that you have this kind of empirical science/art, you can apply it to other more nuanced things like scaling laws applied to interpretability or scaling laws applied to post-training. Or just seeing how does this thing scale. But the big scaling law, I guess the underlying scaling hypothesis has to do with big networks, big data leads to intelligence?",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 275.46,
+      "_v1_t_start_sec": 465.0,
+      "_drift_sec": 4.4599999999999795,
+      "t_end_sec": 493.7
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 493.7,
+      "text": "Yeah, we've documented scaling laws in lots of domains other than language. So initially the paper we did that first showed it, was in early 2020, where we first showed it for language. There was then some work late in 2020 where we showed the same thing for other modalities like images, video, text to image, image to text, math. They all had the same pattern. And you're right, now there are other stages like post-training or there are new types of reasoning models. And in all of those cases that we've measured, we see similar types of scaling laws.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 299.7,
+      "_v1_t_start_sec": 489.0,
+      "_drift_sec": 4.699999999999989,
+      "t_end_sec": 531.4200000000001
+    },
+    {
+      "speaker": "Lex Fridman",
+      "t_start_sec": 531.4200000000001,
+      "text": "A bit of a philosophical question, but what's your intuition about why bigger is better in terms of network size and data size? Why does it lead to more intelligent models?",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 337.42,
+      "_v1_t_start_sec": 528.0,
+      "_drift_sec": 3.4200000000000728,
+      "t_end_sec": 544.02
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 544.02,
+      "text": "So in my previous career as a biophysicist So I did a physics undergrad and then biophysics in grad school. So I think back to what I know as a physicist, which is actually much less than what some of my colleagues at Anthropic have in terms of expertise in physics. There's this concept called the one over F noise and one over X distributions, where often, just like if you add up a bunch of natural processes, you get a Gaussian, if you add up a bunch of differently-distributed natural processes If you take a probe and hook it up to a resistor, the distribution of the thermal noise in the resistor goes as one over the frequency. It's some kind of natural convergent distribution.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 350.02,
+      "_v1_t_start_sec": 540.0,
+      "_drift_sec": 4.019999999999982,
+      "t_end_sec": 593.2
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 593.2,
+      "text": "And I think what it amounts to, is that if you look at a lot of things that are produced by some natural process that has a lot of different scales, not a Gaussian, which is kind of narrowly distributed, but if I look at large and small fluctuations that lead to electrical noise, they have this decaying one over X distribution. And so now I think of patterns in the physical world or in language. If I think about the patterns in language, there are some really simple patterns, some words are much more common than others, like the. Then there's basic noun-verb structure. Then there's the fact that nouns and verbs have to agree, they have to coordinate. And there's the higher-level sentence structure. Then there's the thematic structure of paragraphs. And so the fact that there's this regressing structure, you can imagine that as you make the networks larger, first they capture the really simple correlations, the really simple patterns, and there's this long tail of other patterns.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 399.2,
+      "_v1_t_start_sec": 590.0,
+      "_drift_sec": 3.2000000000000455,
+      "t_end_sec": 653.8199999999999
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 653.8199999999999,
+      "text": "And if that long tail of other patterns is really smooth like it is with the one over F noise in physical processes like resistors, then you can imagine as you make the network larger, it's kind of capturing more and more of that distribution. And so that smoothness gets reflected in how well the models are at predicting and how well they perform.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 459.82,
+      "_v1_t_start_sec": 649.0,
+      "_drift_sec": 4.819999999999936,
+      "t_end_sec": 674.76
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 674.76,
+      "text": "Language is an evolved process. We've developed language, we have common words and less common words. We have common expressions and less common expressions. We have ideas, cliches, that are expressed frequently, and we have novel ideas. And that process has developed, has evolved with humans over millions of years. And so the guess, and this is pure speculation, would be that there's some kind of long tail distribution of the distribution of these ideas.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 480.76,
+      "_v1_t_start_sec": 670.0,
+      "_drift_sec": 4.759999999999991,
+      "t_end_sec": 705.7
+    },
+    {
+      "speaker": "Lex Fridman",
+      "t_start_sec": 705.7,
+      "text": "So there's the long tail, but also there's the height of the hierarchy of concepts that you're building up. So the bigger the network, presumably you have a higher capacity to-",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 511.7,
+      "_v1_t_start_sec": 701.0,
+      "_drift_sec": 4.7000000000000455,
+      "t_end_sec": 714.74
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 714.74,
+      "text": "Exactly. If you have a small network, you only get the common stuff. If I take a tiny neural network, it's very good at understanding that a sentence has to have verb, adjective, noun, but it's terrible at deciding what those verb adjective and noun should be and whether they should make sense. If I make it just a little bigger, it gets good at that, then suddenly it's good at the sentences, but it's not good at the paragraphs. And so these rarer and more complex patterns get picked up as I add more capacity to the network.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 520.74,
+      "_v1_t_start_sec": 710.0,
+      "_drift_sec": 4.740000000000009,
+      "t_end_sec": 744.2
+    },
+    {
+      "speaker": "Lex Fridman",
+      "t_start_sec": 744.2,
+      "text": "Well, the natural question then is what's the ceiling of this?",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 550.2,
+      "_v1_t_start_sec": 740.0,
+      "_drift_sec": 4.2000000000000455,
+      "t_end_sec": 747.92
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 747.92,
+      "text": "Yeah.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 553.92,
+      "_v1_t_start_sec": 744.0,
+      "_drift_sec": 3.919999999999959,
+      "t_end_sec": 748.48
+    },
+    {
+      "speaker": "Lex Fridman",
+      "t_start_sec": 748.48,
+      "text": "How complicated and complex is the real world? How much is the stuff is there to learn?",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 554.48,
+      "_v1_t_start_sec": 744.0,
+      "_drift_sec": 4.480000000000018,
+      "t_end_sec": 754.26
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 754.26,
+      "text": "I don't think any of us knows the answer to that question. My strong instinct would be that there's no ceiling below the level of humans. We humans are able to understand these various patterns. And so that makes me think that if we continue to scale up these models to kind of develop new methods for training them and scaling them up, that will at least get to the level that we've gotten to with humans. There's then a question of how much more is it possible to understand than humans do? How much is it possible to be smarter and more perceptive than humans? I would guess the answer has got to be domain-dependent.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 560.26,
+      "_v1_t_start_sec": 750.0,
+      "_drift_sec": 4.259999999999991,
+      "t_end_sec": 793.8
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 793.8,
+      "text": "If I look at an area like biology, and I wrote this essay, Machines of Loving Grace, it seems to me that humans are struggling to understand the complexity of biology. If you go to Stanford or to Harvard or to Berkeley, you have whole departments of folks trying to study the immune system or metabolic pathways, and each person understands only a tiny bit, a part of it, specializes. And they're struggling to combine their knowledge with that of other humans. And so I have an instinct that there's a lot of room at the top for AIs to get smarter.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 599.8,
+      "_v1_t_start_sec": 789.0,
+      "_drift_sec": 4.7999999999999545,
+      "t_end_sec": 829.78
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 829.78,
+      "text": "If I think of something like materials in the physical world, or addressing conflicts between humans or something like that, I mean it may be there's only some of these problems are not intractable, but much harder. And it may be that there's only so well you can do at some of these things. Just like with speech recognition, there's only so clear I can hear your speech. So I think in some areas there may be ceilings that are very close to what humans have done. In other areas, those ceilings may be very far away. I think we'll only find out when we build these systems. It's very hard to know in advance. We can speculate, but we can't be sure.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 635.78,
+      "_v1_t_start_sec": 826.0,
+      "_drift_sec": 3.7799999999999727,
+      "t_end_sec": 870.12
+    },
+    {
+      "speaker": "Lex Fridman",
+      "t_start_sec": 870.12,
+      "text": "And in some domains, the ceiling might have to do with human bureaucracies and things like this, as you write about.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 676.12,
+      "_v1_t_start_sec": 866.0,
+      "_drift_sec": 4.1200000000000045,
+      "t_end_sec": 875.56
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 875.56,
+      "text": "Yes.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 681.56,
+      "_v1_t_start_sec": 871.0,
+      "_drift_sec": 4.559999999999945,
+      "t_end_sec": 875.96
+    },
+    {
+      "speaker": "Lex Fridman",
+      "t_start_sec": 875.96,
+      "text": "So humans fundamentally has to be part of the loop. That's the cause of the ceiling, not maybe the limits of the intelligence.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 681.96,
+      "_v1_t_start_sec": 871.0,
+      "_drift_sec": 4.960000000000036,
+      "t_end_sec": 882.16
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 882.16,
+      "text": "Yeah, I think in many cases, in theory, technology could change very fast. For example, all the things that we might invent with respect to biology, but remember, there's a clinical trial system that we have to go through to actually administer these things to humans. I think that's a mixture of things that are unnecessary in bureaucratic and things that kind of protect the integrity of society. And the whole challenge is that it's hard to tell what's going on. It's hard to tell which is which.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 688.16,
+      "_v1_t_start_sec": 878.0,
+      "_drift_sec": 4.159999999999968,
+      "t_end_sec": 914.92
+    },
+    {
+      "speaker": "Dario Amodei",
+      "t_start_sec": 914.92,
+      "text": "I think in terms of drug development, my view is that we're too slow and we're too conservative. But certainly if you get these things wrong, it's possible to risk people's lives by being too reckless. And so at least some of these human institutions are in fact protecting people. So it's all about finding the balance. I strongly suspect that balance is kind of more on the side of wishing to make things happen faster, but there is a balance.",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 720.92,
+      "_v1_t_start_sec": 911.0,
+      "_drift_sec": 3.919999999999959,
+      "t_end_sec": 942.66
+    },
+    {
+      "speaker": "Lex Fridman",
+      "t_start_sec": 942.66,
+      "text": "If we do hit a limit, if we do hit a slowdown in the scaling laws, what do you think would be the reason? Is it compute-limited, data-limited? Is it something else? Idea limited?",
+      "_alignment": "v2-aligned",
+      "_slice_sec": 748.66,
+      "_v1_t_start_sec": 939.0,
+      "_drift_sec": 3.659999999999968,
+      "t_end_sec": 972.66
+    }
+  ],
+  "_meta": {
+    "whisper_duration_sec": 756.9935,
+    "slice_anchor_sec": 194.0,
+    "v1_turns": 781,
+    "v2_aligned": 32,
+    "v1_fallback": 0
+  }
+}
