@@ -100,6 +100,26 @@ export class TranscriptView {
     });
   }
 
+  /**
+   * Retroactively rewrite every rendered line currently attributed to srcId
+   * to dstId. Mirrors the DOM shape used by applySpeaker: each row carries
+   * a <span class="spk" data-spk="..."> with background = color+"33" and
+   * color = color. Caller (app.ts) resolves dstName/dstColor from the
+   * SpeakersPanel before invoking, then calls speakers.merge.
+   */
+  mergeSpeakers(srcId: string, dstId: string, dstName: string | null, dstColor: string) {
+    if (srcId === dstId) return;
+    this.el.querySelectorAll<HTMLElement>(`.line .spk[data-spk="${srcId}"]`).forEach((spk) => {
+      spk.dataset.spk = dstId;
+      spk.style.background = dstColor + "33";
+      spk.style.color = dstColor;
+      spk.textContent = dstName ?? dstId;
+    });
+    if (this.lastFinalSpeaker === srcId) {
+      this.lastFinalSpeaker = dstId;
+    }
+  }
+
   // ---- internal: row construction + interaction ---------------------------
 
   private createRow(className: string, seq: number, finalized: boolean): HTMLElement {
