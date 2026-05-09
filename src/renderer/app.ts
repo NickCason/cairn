@@ -134,8 +134,7 @@ function onMsg(m: ServerMsg) {
     const dst = speakers.get(m.speaker_id);
     transcript.relabelLine(m.seq, m.speaker_id, dst.name, dst.color);
   } else if (m.type === "transcript_split") {
-    const msg = m as TranscriptSplitMsg;
-    transcript.splitLine(msg.original_seq, msg.rows, (id) => speakers.get(id));
+    transcript.splitLine(m.original_seq, m.rows, (id) => speakers.get(id));
   } else if (m.type === "ack" && m.of === "start") {
     started = Date.now();
     elapsedTimer = window.setInterval(() => {

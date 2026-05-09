@@ -38,6 +38,7 @@ export class TranscriptView {
   private bySeq = new Map<number, HTMLElement>();
   private lastFinalRow: HTMLElement | null = null;
   private lastFinalSpeaker: string | null = null;
+  private lastFinalEndMs: number | null = null;
   private cb: TranscriptCallbacks;
   constructor(root: HTMLElement, cb: TranscriptCallbacks = {}) {
     this.el = root;
@@ -69,11 +70,21 @@ export class TranscriptView {
     // Speaker pill is interactive only after finalization.
     this.attachSpeakerClick(row, m.seq);
 
+    // Same-speaker mid-sentence coalesce. Requires (a) speaker-id match,
+    // (b) inter-utterance gap under MAX_COALESCE_GAP_MS (real mid-utterance
+    // gaps are <500ms; speaker changes have larger gaps), and (c) no
+    // terminal punctuation on prev. The gap guard exists because brief
+    // streaming misattributions can make two different speakers' utterances
+    // both appear as the same id; without timing, they'd glue into a single
+    // overhung row that survives even after the auth pass relabels it.
+    const MAX_COALESCE_GAP_MS = 600;
+    const gapMs = this.lastFinalEndMs == null ? Infinity : m.t_start_ms - this.lastFinalEndMs;
     if (
       this.lastFinalRow &&
       this.lastFinalRow !== row &&
       !isLocked(this.lastFinalRow) &&
-      this.lastFinalSpeaker === m.speaker_id
+      this.lastFinalSpeaker === m.speaker_id &&
+      gapMs <= MAX_COALESCE_GAP_MS
     ) {
       const prevTextEl = this.lastFinalRow.querySelector<HTMLElement>(".text")!;
       const prevText = prevTextEl.textContent ?? "";
@@ -89,6 +100,7 @@ export class TranscriptView {
 
     this.lastFinalRow = row;
     this.lastFinalSpeaker = m.speaker_id;
+    this.lastFinalEndMs = m.t_end_ms;
   }
 
   // Re-skin all rows when a speaker is renamed/recolored
@@ -182,6 +194,7 @@ export class TranscriptView {
     let insertAfter: HTMLElement | null = anchorRow ?? null;
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
+      if (this.bySeq.has(r.seq)) continue;
       const sp = getSpeaker(r.speaker_id);
       const newRow = this.createRow("line", r.seq, /*finalized=*/true);
       this.assignRowSpeakerVisuals(newRow, r.speaker_id, sp.name, sp.color);
