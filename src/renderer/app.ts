@@ -170,8 +170,30 @@ function onMsg(m: ServerMsg) {
     $stop.textContent = "Stop";
     $start.hidden = true;
   } else if (m.type === "ack" && m.of === "stop") {
-    finalizeSession();
+    $status.textContent = "summarizing…";
+    awaitFinalSummaryThenFinalize();
   }
+}
+
+// Wait for the server's final_summary (success or failure) before writing
+// transcript.jsonl, so the persisted log includes it. Falls back on a timeout
+// (server LLM is bounded by CAIRN_LLM_TIMEOUT_S + drain ≈ 90 + 30s, plus margin).
+let finalizing = false;
+function awaitFinalSummaryThenFinalize() {
+  if (finalizing) return;
+  finalizing = true;
+  const FINAL_WAIT_MS = 150_000;
+  const startedAt = Date.now();
+  const seen = () => eventsLog.some((e) => e.type === "final_summary");
+  const tick = () => {
+    if (seen() || Date.now() - startedAt > FINAL_WAIT_MS) {
+      finalizing = false;
+      finalizeSession();
+      return;
+    }
+    setTimeout(tick, 250);
+  };
+  tick();
 }
 
 async function finalizeSession() {
