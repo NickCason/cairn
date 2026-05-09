@@ -120,6 +120,29 @@ export class TranscriptView {
     }
   }
 
+  /**
+   * Retroactively rewrite a single line (identified by seq) to a different
+   * speaker id. Used by the authoritative-diarization correction flow:
+   * server says "actually seq=42 was speaker S2, not S1 as we emitted".
+   *
+   * dstName/dstColor are resolved by the caller (app.ts) from the
+   * SpeakersPanel — same convention as mergeSpeakers.
+   */
+  relabelLine(seq: number, dstId: string, dstName: string | null, dstColor: string) {
+    const row = this.bySeq.get(seq);
+    if (!row) return;
+    const spk = row.querySelector<HTMLElement>(".spk");
+    if (!spk) return;
+    const prevId = spk.dataset.spk ?? "";
+    spk.dataset.spk = dstId;
+    spk.style.background = dstColor + "33";
+    spk.style.color = dstColor;
+    spk.textContent = dstName ?? dstId;
+    if (this.lastFinalSpeaker === prevId) {
+      this.lastFinalSpeaker = dstId;
+    }
+  }
+
   // ---- internal: row construction + interaction ---------------------------
 
   private createRow(className: string, seq: number, finalized: boolean): HTMLElement {
