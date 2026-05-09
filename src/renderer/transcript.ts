@@ -210,6 +210,29 @@ export class TranscriptView {
     }
   }
 
+  /**
+   * Return a plain-object snapshot of all finalized transcript rows, suitable
+   * for reporting to the main process via cairnControl.reportTranscript.
+   * Partial rows (no speaker yet assigned, class "partial") are omitted.
+   */
+  snapshot(): Array<{ seq: number; speaker_id: string; text: string }> {
+    const result: Array<{ seq: number; speaker_id: string; text: string }> = [];
+    for (const [seq, row] of this.bySeq) {
+      if (row.classList.contains("partial")) continue;
+      const spk = row.querySelector<HTMLElement>(".spk");
+      const textEl = row.querySelector<HTMLElement>(".text");
+      if (!spk || !textEl) continue;
+      result.push({
+        seq,
+        speaker_id: spk.dataset.spk ?? "",
+        text: textEl.textContent ?? "",
+      });
+    }
+    // Sort by seq so callers get a stable ordered array.
+    result.sort((a, b) => a.seq - b.seq);
+    return result;
+  }
+
   // ---- internal: row construction + interaction ---------------------------
 
   private createRow(className: string, seq: number, finalized: boolean): HTMLElement {

@@ -5,11 +5,19 @@ import { handleRollingSummary, handleRollingReplace, handleFinalSummary } from "
 
 const CAIRN_SVC_URL = "ws://100.99.99.72:8300/ws/transcribe";
 
-declare global { interface Window { cairn: {
-  onInit:(cb:(d:any)=>void)=>void;
-  readFile:(p:string)=>Promise<Buffer>;
-  saveSession:(name:string, events:any[])=>Promise<string>;
-} } }
+declare global { interface Window {
+  cairn: {
+    onInit:(cb:(d:any)=>void)=>void;
+    readFile:(p:string)=>Promise<Buffer>;
+    saveSession:(name:string, events:any[])=>Promise<string>;
+  };
+  cairnControl?: {
+    onControlStart: (handler: (payload: { meeting_name: string }) => void) => void;
+    onControlStop: (handler: () => void) => void;
+    reportState: (state: object) => void;
+    reportTranscript: (rows: any[]) => void;
+  };
+} }
 
 const speakers = new SpeakersPanel(document.getElementById("speakers")!, (s) => {
   transcript.applySpeaker(s.id, s.name, s.color);
@@ -118,6 +126,7 @@ function onMsg(m: ServerMsg) {
   else if (m.type === "transcript_final") {
     const sp = speakers.get(m.speaker_id);
     transcript.final(m as TranscriptFinal, { name: sp.name, color: sp.color });
+    reportTranscriptSnapshot();
   } else if (m.type === "speaker_assigned") {
     speakers.add(m.speaker_id, m.color_hint);
   } else if (m.type === "rolling_summary") {
@@ -133,9 +142,12 @@ function onMsg(m: ServerMsg) {
   } else if (m.type === "speaker_relabel") {
     const dst = speakers.get(m.speaker_id);
     transcript.relabelLine(m.seq, m.speaker_id, dst.name, dst.color);
+    reportTranscriptSnapshot();
   } else if (m.type === "transcript_split") {
     transcript.splitLine(m.original_seq, m.rows, (id) => speakers.get(id));
+    reportTranscriptSnapshot();
   } else if (m.type === "ack" && m.of === "start") {
+    window.cairnControl?.reportState({ state: "recording", meeting_name: meetingName });
     started = Date.now();
     elapsedTimer = window.setInterval(() => {
       if (!started) return;
@@ -180,6 +192,7 @@ async function finalizeSession() {
   if (elapsedTimer) clearInterval(elapsedTimer);
   const dir = await window.cairn.saveSession(meetingName, eventsLog);
   $status.textContent = `saved → ${dir.split("/").slice(-1)[0]}`;
+  window.cairnControl?.reportState({ state: "stopped", session_dir: dir });
 
   if (demoModeActive || isBenchmarkMode) {
     // benchmark / demo: close the window so the test runner / recording can finish
@@ -208,14 +221,16 @@ function clearTranscript() {
 
 $clear.onclick = clearTranscript;
 
-$stop.onclick = async () => {
+async function stopLiveSession() {
   $stop.disabled = true;
   $stop.textContent = "stopping…";
   $recdot.hidden = true;
   $status.textContent = "stopping";
   if (stopAudio) { try { await stopAudio(); } catch {} stopAudio = null; }
   ws?.stop();
-};
+}
+
+$stop.onclick = () => { stopLiveSession(); };
 
 async function startLiveSession() {
   $start.hidden = true;
@@ -250,6 +265,25 @@ async function startLiveSession() {
 }
 
 $start.onclick = () => { startLiveSession(); };
+
+// ── HTTP control bridge ────────────────────────────────────────────────────
+// Push a snapshot of the in-memory transcript rows to the main process so
+// the HTTP /control/transcript endpoint stays current.
+function reportTranscriptSnapshot() {
+  window.cairnControl?.reportTranscript(transcript.snapshot());
+}
+
+const ctrl = window.cairnControl;
+if (ctrl) {
+  ctrl.onControlStart(({ meeting_name }: { meeting_name: string }) => {
+    meetingName = meeting_name;
+    startLiveSession();
+  });
+  ctrl.onControlStop(() => {
+    stopLiveSession();
+  });
+}
+// ──────────────────────────────────────────────────────────────────────────
 
 $viewTranscript?.addEventListener("click", () => {
   if ($transcriptLines) $transcriptLines.hidden = false;

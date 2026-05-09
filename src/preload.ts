@@ -24,3 +24,18 @@ contextBridge.exposeInMainWorld("cairn", {
   readFile: (p: string) => ipcRenderer.invoke("read-file", p),
   saveSession: (meetingName: string, events: any[]) => ipcRenderer.invoke("save-session", { meetingName, events }),
 });
+
+contextBridge.exposeInMainWorld("cairnControl", {
+  onControlStart: (handler: (payload: { meeting_name: string }) => void) => {
+    ipcRenderer.on("cairn:control-start", (_e, payload) => handler(payload));
+  },
+  onControlStop: (handler: () => void) => {
+    ipcRenderer.on("cairn:control-stop", () => handler());
+  },
+  reportState: (state: object) => {
+    ipcRenderer.send("cairn:report-state", state);
+  },
+  reportTranscript: (rows: any[]) => {
+    ipcRenderer.send("cairn:report-transcript", rows);
+  },
+});
