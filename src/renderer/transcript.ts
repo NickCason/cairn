@@ -64,6 +64,8 @@ export class TranscriptView {
       this.el.appendChild(row);
     }
     row.classList.remove("partial");
+    row.dataset.tStartMs = String(m.t_start_ms);
+    row.dataset.tEndMs = String(m.t_end_ms);
     this.assignRowSpeakerVisuals(row, m.speaker_id, speakerLabel.name, speakerLabel.color);
     const textEl = row.querySelector<HTMLElement>(".text")!;
     textEl.textContent = m.text;
@@ -90,6 +92,7 @@ export class TranscriptView {
       const prevText = prevTextEl.textContent ?? "";
       if (canMergeSentence(prevText, m.text)) {
         prevTextEl.textContent = prevText.replace(/[\s,;:]+$/, "") + " " + m.text;
+        this.lastFinalRow.dataset.tEndMs = String(m.t_end_ms);
         for (const [seq, r] of this.bySeq) {
           if (r === row) this.bySeq.set(seq, this.lastFinalRow);
         }
@@ -188,6 +191,11 @@ export class TranscriptView {
     // Mutate the existing row: relabel speaker, then update text.
     this.relabelLine(originalSeq, first.speaker_id, firstSpeaker.name, firstSpeaker.color);
     this.updateLineText(originalSeq, first.text);
+    const existingRow = this.bySeq.get(originalSeq);
+    if (existingRow) {
+      existingRow.dataset.tStartMs = String(first.t_start_ms);
+      existingRow.dataset.tEndMs = String(first.t_end_ms);
+    }
 
     // Insert rows[1:] as new finalized rows immediately after originalSeq's DOM node.
     const anchorRow = this.bySeq.get(originalSeq);
@@ -199,6 +207,8 @@ export class TranscriptView {
       const newRow = this.createRow("line", r.seq, /*finalized=*/true);
       this.assignRowSpeakerVisuals(newRow, r.speaker_id, sp.name, sp.color);
       newRow.querySelector<HTMLElement>(".text")!.textContent = r.text;
+      newRow.dataset.tStartMs = String(r.t_start_ms);
+      newRow.dataset.tEndMs = String(r.t_end_ms);
       this.attachSpeakerClick(newRow, r.seq);
       // Insert directly after the previous row (anchor or last inserted).
       if (insertAfter && insertAfter.parentNode === this.el) {
@@ -215,8 +225,8 @@ export class TranscriptView {
    * for reporting to the main process via cairnControl.reportTranscript.
    * Partial rows (no speaker yet assigned, class "partial") are omitted.
    */
-  snapshot(): Array<{ seq: number; speaker_id: string; text: string }> {
-    const result: Array<{ seq: number; speaker_id: string; text: string }> = [];
+  snapshot(): Array<{ seq: number; speaker_id: string; text: string; t_start_ms: number; t_end_ms: number }> {
+    const result: Array<{ seq: number; speaker_id: string; text: string; t_start_ms: number; t_end_ms: number }> = [];
     for (const [seq, row] of this.bySeq) {
       if (row.classList.contains("partial")) continue;
       const spk = row.querySelector<HTMLElement>(".spk");
@@ -226,6 +236,8 @@ export class TranscriptView {
         seq,
         speaker_id: spk.dataset.spk ?? "",
         text: textEl.textContent ?? "",
+        t_start_ms: parseInt(row.dataset.tStartMs || "0", 10),
+        t_end_ms: parseInt(row.dataset.tEndMs || "0", 10),
       });
     }
     // Sort by seq so callers get a stable ordered array.
