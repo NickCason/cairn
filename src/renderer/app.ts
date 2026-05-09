@@ -130,6 +130,9 @@ function onMsg(m: ServerMsg) {
     const dstSpeaker = speakers.get(m.dst);
     speakers.merge(m.src, m.dst);
     transcript.mergeSpeakers(m.src, m.dst, dstSpeaker.name, dstSpeaker.color);
+  } else if (m.type === "speaker_relabel") {
+    const dst = speakers.get(m.speaker_id);
+    transcript.relabelLine(m.seq, m.speaker_id, dst.name, dst.color);
   } else if (m.type === "ack" && m.of === "start") {
     started = Date.now();
     elapsedTimer = window.setInterval(() => {
