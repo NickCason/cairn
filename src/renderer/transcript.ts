@@ -85,8 +85,9 @@ export class TranscriptView {
     // both appear as the same id; without timing, they'd glue into a single
     // overhung row that survives even after the auth pass relabels it.
     // 300ms is short enough to still glue a real mid-utterance pause
-    // but tight enough that brief cross-speaker insertions (Lex saying
-    // "exactly" mid-Dario, etc.) are far less likely to merge.
+    // but tight enough that brief cross-speaker insertions (a one-word
+    // backchannel landing inside another speaker's turn) are far less
+    // likely to merge.
     const MAX_COALESCE_GAP_MS = 300;
     const gapMs = this.lastFinalEndMs == null ? Infinity : m.t_start_ms - this.lastFinalEndMs;
     if (
