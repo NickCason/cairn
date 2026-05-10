@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# steeLL-v1 helper — route a coding subtask to qwen3.6:35b-a3b on n8.
+# steeLL-v1 helper — route a coding subtask to a Qwen coder model on n8 (ollama).
+# Default model: qwen2.5-coder:7b. Override with QWEN_MODEL env var.
 # Logs every call to cairn-build-stats/qwen-calls.jsonl.
 #
 # Usage:
@@ -7,6 +8,7 @@
 # Output: model response on stdout.
 set -euo pipefail
 TASK_SUMMARY="${1:-unspecified}"
+MODEL="${QWEN_MODEL:-qwen2.5-coder:7b}"
 STATS_FILE="$(dirname "$0")/../cairn-build-stats/qwen-calls.jsonl"
 mkdir -p "$(dirname "$STATS_FILE")"
 PROMPT=$(cat)
@@ -15,8 +17,8 @@ TMP=$(mktemp)
 START_NS=$(date +%s%N)
 curl -sS http://100.122.121.18:11434/api/chat \
   -H "Content-Type: application/json" \
-  -d "$(jq -n --arg p "$PROMPT" '{
-    model: "qwen3.6:35b-a3b",
+  -d "$(jq -n --arg p "$PROMPT" --arg m "$MODEL" '{
+    model: $m,
     messages: [{role:"user", content:$p}],
     stream: false,
     options: {num_ctx: 8192, temperature: 0.2}
@@ -26,7 +28,7 @@ DUR_S=$(awk "BEGIN { printf \"%.2f\", ($END_NS - $START_NS) / 1000000000 }")
 RESPONSE=$(jq -r '.message.content // empty' "$TMP")
 PT=$(jq -r '.prompt_eval_count // 0' "$TMP")
 CT=$(jq -r '.eval_count // 0' "$TMP")
-jq -nc --arg ts "$TS" --arg s "$TASK_SUMMARY" --arg m "qwen3.6:35b-a3b" \
+jq -nc --arg ts "$TS" --arg s "$TASK_SUMMARY" --arg m "$MODEL" \
        --argjson pt "$PT" --argjson ct "$CT" --argjson d "$DUR_S" \
        '{ts:$ts, task_summary:$s, model:$m, prompt_tokens:$pt, completion_tokens:$ct, eval_duration_s:$d, verdict:"pending"}' \
        >> "$STATS_FILE"
