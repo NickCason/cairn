@@ -40,3 +40,45 @@ export function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+export type SpeakerInfo = { id: string; name: string | null; color: string };
+
+const REGEX_META = /[.*+?^${}()|[\]\\]/g;
+function escapeRegex(s: string): string {
+  return s.replace(REGEX_META, "\\$&");
+}
+
+/**
+ * HTML-escape ``text``, then for each speaker in ``registry`` wrap every
+ * variant of its SID (and, if the speaker has a user-assigned name, every
+ * bare occurrence of the name) in a colored <span class="spkref">. Returns
+ * safe HTML.
+ *
+ * Two-pass to avoid double-wrapping:
+ *   1. Substitute SID variants → wrapped spans.
+ *   2. For each named speaker, split the result on existing .spkref span
+ *      boundaries and only apply name-substitution to the non-span chunks.
+ */
+export function renderWithSpeakerTokens(text: string, registry: SpeakerInfo[]): string {
+  let out = escapeHtml(text);
+
+  // Pass 1: SID variants → spans.
+  for (const spk of registry) {
+    const display = spk.name ?? spk.id;
+    const span = `<span class="spkref" data-spk="${spk.id}" style="color:${spk.color};font-weight:600">${escapeHtml(display)}</span>`;
+    out = substituteSpeakerVariants(out, spk.id, span);
+  }
+
+  // Pass 2: bare user-name occurrences → spans, skipping inside existing spans.
+  for (const spk of registry) {
+    if (!spk.name) continue;
+    const span = `<span class="spkref" data-spk="${spk.id}" style="color:${spk.color};font-weight:600">${escapeHtml(spk.name)}</span>`;
+    const nameRe = new RegExp(`(?<![A-Za-z0-9_])${escapeRegex(escapeHtml(spk.name))}(?![A-Za-z0-9_])`, "gi");
+    const parts = out.split(/(<span class="spkref"[^>]*>[^<]*<\/span>)/g);
+    out = parts
+      .map((p) => (p.startsWith('<span class="spkref"') ? p : p.replace(nameRe, span)))
+      .join("");
+  }
+
+  return out;
+}
