@@ -1,4 +1,0 @@
-{"ts": "2026-05-08T04:45:57Z", "task_summary": "smoke test", "model": "qwen3.6:35b-a3b", "prompt_tokens": 26, "completion_tokens": 760, "eval_duration_s": 145.24, "verdict": "discarded"}
-{"ts": "2026-05-08T05:42:47Z", "task_summary": "qualitative review of steeLL-v1 for Cairn build", "model": "qwen3.6:35b-a3b", "prompt_tokens": 234, "completion_tokens": 1813, "eval_duration_s": 325.44, "verdict": "used_after_edit"}
-{"ts":"2026-05-08T05:58:14Z","task_summary":"rewrite cairn_svc/diarize.py: swap simple-diarizer for pyannote.audio 3.3.1","model":"qwen3.6:35b-a3b","prompt_tokens":1537,"completion_tokens":4877,"eval_duration_s":832.06,"verdict":"used_after_edit"}
-{"ts":"2026-05-08T06:15:05Z","task_summary":"drop num_speakers:4 from smoke test start message","model":"qwen3.6:35b-a3b","prompt_tokens":1147,"completion_tokens":2871,"eval_duration_s":491.33,"verdict":"used"}
