@@ -54,12 +54,37 @@ def overlap_ms(a_start, a_end, b_start, b_end) -> int:
     return max(0, min(a_end, b_end) - max(a_start, b_start))
 
 
+def reference_entries(reference: dict) -> list[dict]:
+    """Return the list of reference entries, accepting both schemas:
+    - lex-style `entries: [{speaker, t_start_sec, t_end_sec, ...}]`
+    - youtube-style `turns:   [{speaker, t_start_sec, t_end_sec, ...}]`
+    """
+    if "entries" in reference:
+        return reference["entries"]
+    if "turns" in reference:
+        return reference["turns"]
+    return []
+
+
+def is_turn_only_reference(reference: dict) -> bool:
+    """Turn-only references carry synthetic per-turn speaker ids and lack
+    real identities — speaker_accuracy is meaningless and should be skipped.
+    Heuristic: source flag, or all speaker labels are unique (1:1 with rows)."""
+    if reference.get("source") == "youtube-auto-captions":
+        return True
+    es = reference_entries(reference)
+    if not es:
+        return False
+    speakers = [e.get("speaker") for e in es]
+    return len(set(speakers)) == len(speakers)
+
+
 def normalize_reference(reference: dict) -> list[dict]:
     """Convert reference entries to absolute Cairn-timeline ms (subtract
     anchor_sec)."""
     anchor_ms = int(reference.get("anchor_sec", 0) * 1000)
     out = []
-    for e in reference["entries"]:
+    for e in reference_entries(reference):
         out.append({
             "speaker": e["speaker"],
             "t_start_ms": int(e["t_start_sec"] * 1000) - anchor_ms,
@@ -78,8 +103,14 @@ def ref_speaker_for_time(t_ms: int, ref_entries: list[dict]) -> str | None:
     return None
 
 
-def grade_word_level(transcript: list[dict], ref_entries: list[dict]) -> dict:
-    """Word-level grading. Requires `words` field on each Cairn final."""
+def grade_word_level(transcript: list[dict], ref_entries: list[dict], turn_only: bool = False) -> dict:
+    """Word-level grading. Requires `words` field on each Cairn final.
+
+    When `turn_only=True`, the reference's per-turn speaker ids are synthetic
+    (one id per turn) and identity-based speaker accuracy is meaningless.
+    Bleed remains correctly defined as boundary-crossing, but the
+    speaker_accuracy / mapping / misattributions blocks are omitted.
+    """
     bleed_finals: list[dict] = []
     gradeable_finals = 0
     off_script_finals = 0
@@ -134,6 +165,21 @@ def grade_word_level(transcript: list[dict], ref_entries: list[dict]) -> dict:
         cs = f.get("speaker_id", "")
         for s in known:
             word_speakers.append((cs, s))
+
+    if turn_only:
+        return {
+            "summary": {
+                "mode": "word-level (turn-only)",
+                "total_finals": len(transcript),
+                "gradeable_finals": gradeable_finals,
+                "bleed_finals": len(bleed_finals),
+                "off_script_finals": off_script_finals,
+                "bleed_rate": round(len(bleed_finals) / gradeable_finals if gradeable_finals else 0.0, 4),
+                "word_total": word_total,
+                "word_off_script": word_off_script,
+            },
+            "bleeds": bleed_finals,
+        }
 
     # Infer Cairn-speaker → ref-speaker mapping by majority vote on words.
     cs_to_ref = defaultdict(Counter)
@@ -256,7 +302,7 @@ def auto_calibrate_anchor(transcript: list[dict], reference: dict) -> float:
         toks = [w for w in re.split(r"[^a-z0-9']+", (s or "").lower()) if w]
         return toks[:n]
 
-    ref_entries = reference.get("entries", [])
+    ref_entries = reference_entries(reference)
     pairs: list[float] = []  # offsets in seconds: cairn_time - (ref_time - anchor)
     used_ref = set()
     for f in transcript:
@@ -302,8 +348,9 @@ def grade(transcript: list[dict], reference: dict, anchor_sec: float | None = No
         for f in transcript
         if "type" not in f or f.get("type") == "transcript_final"
     )
+    turn_only = is_turn_only_reference(reference)
     if has_words:
-        return grade_word_level(transcript, ref_entries)
+        return grade_word_level(transcript, ref_entries, turn_only=turn_only)
     return grade_time_only(transcript, ref_entries)
 
 
@@ -339,6 +386,13 @@ def main() -> int:
             f"({s['word_total'] - s['word_off_script']} on-script words); "
             f"off-script finals: {s['off_script_finals']}; "
             f"mapping: {s['speaker_mapping']}"
+        )
+    elif s["mode"] == "word-level (turn-only)":
+        print(
+            f"[word-level/turn-only] Bleed: {s['bleed_finals']}/{s['gradeable_finals']} = "
+            f"{s['bleed_rate'] * 100:.1f}%; "
+            f"on-script words: {s['word_total'] - s['word_off_script']}; "
+            f"off-script finals: {s['off_script_finals']}"
         )
     else:
         print(
