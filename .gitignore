@@ -9,3 +9,5 @@ benchmarks/*.mp3
 package-lock.json
 dist-app/
 .superpowers/
+.claude/
+__pycache__/
