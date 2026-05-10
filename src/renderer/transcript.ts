@@ -33,6 +33,11 @@ function isLocked(row: HTMLElement): boolean {
   return row.dataset.locked === "1";
 }
 
+function mmss(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
 export class TranscriptView {
   private el: HTMLElement;
   private bySeq = new Map<number, HTMLElement>();
@@ -43,6 +48,7 @@ export class TranscriptView {
   private lastFinalRow: HTMLElement | null = null;
   private lastFinalSpeaker: string | null = null;
   private lastFinalEndMs: number | null = null;
+  private sessionStartMs: number | null = null;
   private cb: TranscriptCallbacks;
   constructor(root: HTMLElement, cb: TranscriptCallbacks = {}) {
     this.el = root;
@@ -63,6 +69,7 @@ export class TranscriptView {
   final(m: TranscriptFinal, speakerLabel: { name: string|null, color: string }) {
     let row = this.bySeq.get(m.seq);
     if (row && isLocked(row)) return;
+    const isNewRow = !row;
     if (!row) {
       row = this.createRow("line", m.seq, /*finalized=*/true);
       this.el.appendChild(row);
@@ -76,6 +83,19 @@ export class TranscriptView {
     // Speaker pill is interactive only after finalization.
     this.attachSpeakerClick(row, m.seq);
     if (m.words && m.words.length) this.wordsByRow.set(row, [...m.words]);
+
+    // Timestamp: anchor on first final, render relative elapsed time.
+    if (this.sessionStartMs == null) this.sessionStartMs = m.t_start_ms;
+    if (isNewRow) {
+      const ts = document.createElement("span");
+      ts.className = "ts";
+      ts.textContent = mmss(m.t_start_ms - (this.sessionStartMs ?? m.t_start_ms));
+      row.appendChild(ts);
+      row.style.setProperty("--row-accent", speakerLabel.color || "#79c0ff");
+      row.classList.add("fresh");
+      window.setTimeout(() => row!.classList.add("fade-rail"), 1100);
+      window.setTimeout(() => row!.classList.remove("fresh", "fade-rail"), 1900);
+    }
 
     // Same-speaker mid-sentence coalesce. Requires (a) speaker-id match,
     // (b) inter-utterance gap under MAX_COALESCE_GAP_MS (real mid-utterance
@@ -122,10 +142,23 @@ export class TranscriptView {
 
   // Re-skin all rows when a speaker is renamed/recolored
   applySpeaker(speakerId: string, name: string|null, color: string) {
-    this.el.querySelectorAll<HTMLElement>(`.line .spk[data-spk="${speakerId}"]`).forEach(spk => {
+    this.el.querySelectorAll<HTMLElement>(`.line .spk[data-spk="${speakerId}"]`).forEach((spk) => {
+      const row = spk.closest<HTMLElement>(".line");
       spk.style.background = color + "33";
       spk.style.color = color;
       spk.textContent = name ?? speakerId;
+      if (row) {
+        row.classList.remove("relabel-pulse", "relabel-anim", "relabel-settle");
+        void row.offsetWidth;
+        row.classList.add("relabel-pulse", "relabel-anim");
+        window.setTimeout(() => {
+          row.classList.remove("relabel-anim");
+          row.classList.add("relabel-settle");
+        }, 380);
+        window.setTimeout(() => {
+          row.classList.remove("relabel-pulse", "relabel-settle");
+        }, 900);
+      }
     });
   }
 
@@ -234,6 +267,11 @@ export class TranscriptView {
       } else {
         this.el.appendChild(newRow);
       }
+      // Accent rail + slide-in animation for split rows.
+      newRow.style.setProperty("--row-accent", sp.color || "#79c0ff");
+      newRow.classList.add("fresh");
+      window.setTimeout(() => newRow.classList.add("fade-rail"), 1100);
+      window.setTimeout(() => newRow.classList.remove("fresh", "fade-rail"), 1900);
       insertAfter = newRow;
     }
   }
