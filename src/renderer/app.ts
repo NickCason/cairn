@@ -1,7 +1,7 @@
 import { CairnWS, TranscriptFinal, TranscriptPartial, SpeakerAssigned, ServerMsg, TranscriptSplitMsg } from "./ws.js";
 import { TranscriptView } from "./transcript.js";
 import { SpeakersPanel } from "./speakers.js";
-import { handleRollingSummary, handleRollingReplace, handleFinalSummary } from "./summary.js";
+import { handleRollingSummary, handleRollingReplace, handleFinalSummary, redrawSummaries, resetSummaryCache } from "./summary.js";
 
 const CAIRN_SVC_URL = "ws://100.99.99.72:8300/ws/transcribe";
 
@@ -22,6 +22,7 @@ declare global { interface Window {
 const speakers = new SpeakersPanel(document.getElementById("speakers")!, (s) => {
   transcript.applySpeaker(s.id, s.name, s.color);
   ws?.rename(s.id, s.name ?? s.id, s.color);
+  redrawSummaries(speakers.list().map((sp) => ({ id: sp.id, name: sp.name, color: sp.color })));
 });
 const transcript = new TranscriptView(document.getElementById("transcript-lines")!, {
   onTextEdit: (seq, text) => {
@@ -215,6 +216,7 @@ function clearTranscript() {
   eventsLog = [];
   // Reset speakers panel internal state so renamed/colored speakers from prior session don't carry over
   speakers.reset();
+  resetSummaryCache();
   $clear.hidden = true;
   $status.textContent = "ready";
 }

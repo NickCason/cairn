@@ -105,3 +105,10 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 #final-summary .truncated-banner { background: var(--pane-bg-2); border: 1px solid var(--border);
                                    border-radius: 4px; padding: 6px 10px; font-size: 11px;
                                    color: var(--muted); margin-bottom: 12px; }
+
+/* Inline speaker token in rolling/final summary text. Color comes from
+   the inline style attribute (matches the speaker pill color). */
+.spkref {
+  font-weight: 600;
+  /* color set via inline style for per-speaker hue */
+}
