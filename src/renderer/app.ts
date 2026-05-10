@@ -24,6 +24,12 @@ const speakers = new SpeakersPanel(document.getElementById("speakers")!, (s) => 
   transcript.applySpeaker(s.id, s.name, s.color);
   ws?.rename(s.id, s.name ?? s.id, s.color);
   redrawSummaries(speakers.list().map((sp) => ({ id: sp.id, name: sp.name, color: sp.color })));
+  if (sessionState === "stopped" && savedSessionDir) {
+    // WS is closed; rewrite the saved file in place by re-calling saveSession
+    // with the baked events. The IPC handler already overwrites the file.
+    const baked = bakeNamesIntoEvents(eventsLog, speakers.list().map((sp) => ({ id: sp.id, name: sp.name })));
+    void window.cairn.saveSession(meetingName, baked);
+  }
 });
 const transcript = new TranscriptView(document.getElementById("transcript-lines")!, {
   onTextEdit: (seq, text) => {
@@ -65,6 +71,7 @@ let demoModeActive: string | null = null;
 let isLiveMode = false;
 let isBenchmarkMode = false;
 let savedSessionDir: string | null = null;
+let sessionState: "idle" | "recording" | "stopped" = "idle";
 
 // === Device picker ===
 function loadDeviceId(): string {
@@ -150,6 +157,7 @@ function onMsg(m: ServerMsg) {
     transcript.splitLine(m.original_seq, m.rows, (id) => speakers.get(id));
     reportTranscriptSnapshot();
   } else if (m.type === "ack" && m.of === "start") {
+    sessionState = "recording";
     window.cairnControl?.reportState({ state: "recording", meeting_name: meetingName });
     started = Date.now();
     elapsedTimer = window.setInterval(() => {
@@ -229,6 +237,7 @@ async function finalizeSession() {
   const baked = bakeNamesIntoEvents(eventsLog, speakers.list().map((s) => ({ id: s.id, name: s.name })));
   const dir = await window.cairn.saveSession(meetingName, baked);
   savedSessionDir = dir;
+  sessionState = "stopped";
   $status.textContent = `saved → ${dir.split("/").slice(-1)[0]}`;
   window.cairnControl?.reportState({ state: "stopped", session_dir: dir });
 
@@ -272,6 +281,7 @@ async function stopLiveSession() {
 $stop.onclick = () => { stopLiveSession(); };
 
 async function startLiveSession() {
+  sessionState = "idle";
   $start.hidden = true;
   $clear.hidden = true;
   $status.textContent = "connecting…";
