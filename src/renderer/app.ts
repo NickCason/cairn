@@ -2,6 +2,7 @@ import { CairnWS, TranscriptFinal, TranscriptPartial, SpeakerAssigned, ServerMsg
 import { TranscriptView } from "./transcript.js";
 import { SpeakersPanel } from "./speakers.js";
 import { handleRollingSummary, handleRollingReplace, handleFinalSummary, redrawSummaries, resetSummaryCache } from "./summary.js";
+import { substituteSpeakerVariants } from "./speaker-substitute.js";
 
 const CAIRN_SVC_URL = "ws://100.99.99.72:8300/ws/transcribe";
 
@@ -63,6 +64,7 @@ let stopAudio: (() => Promise<void>) | null = null;
 let demoModeActive: string | null = null;
 let isLiveMode = false;
 let isBenchmarkMode = false;
+let savedSessionDir: string | null = null;
 
 // === Device picker ===
 function loadDeviceId(): string {
@@ -187,11 +189,46 @@ function awaitFinalSummaryThenFinalize() {
   tick();
 }
 
+function bakeNamesIntoEvents(events: any[], registry: { id: string; name: string | null }[]): any[] {
+  const named = registry.filter((r) => r.name && r.name !== r.id) as { id: string; name: string }[];
+  if (!named.length) return events;
+  const subAll = (text: string): string => {
+    let t = text;
+    for (const r of named) t = substituteSpeakerVariants(t, r.id, r.name);
+    return t;
+  };
+  return events.map((e) => {
+    if (e.type === "rolling_summary" || e.type === "rolling_summary_replace") {
+      return { ...e, bullets: (e.bullets || []).map(subAll) };
+    }
+    if (e.type === "final_summary" && e.ok) {
+      return {
+        ...e,
+        tldr: subAll(e.tldr || ""),
+        speakers: (e.speakers || []).map((sp: any) => ({
+          ...sp,
+          speaker: subAll(sp.speaker || ""),
+          contributions: (sp.contributions || []).map(subAll),
+        })),
+        decisions: (e.decisions || []).map(subAll),
+        action_items: (e.action_items || []).map((a: any) => ({
+          ...a,
+          assignee: subAll(a.assignee || ""),
+          item: subAll(a.item || ""),
+        })),
+      };
+    }
+    return e;
+  });
+}
+
 async function finalizeSession() {
   $recdot.hidden = true;
   $stop.hidden = true;
   if (elapsedTimer) clearInterval(elapsedTimer);
-  const dir = await window.cairn.saveSession(meetingName, eventsLog);
+  const baked = bakeNamesIntoEvents(eventsLog, speakers.list().map((s) => ({ id: s.id, name: s.name })));
+  const dir = await window.cairn.saveSession(meetingName, baked);
+  savedSessionDir = dir;
   $status.textContent = `saved → ${dir.split("/").slice(-1)[0]}`;
   window.cairnControl?.reportState({ state: "stopped", session_dir: dir });
 
