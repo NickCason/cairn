@@ -109,8 +109,11 @@ async function refreshDeviceList() {
 refreshDeviceList();
 
 // Warm-up mic permission so deviceIds stabilize and labels populate before
-// the user clicks Start. With Safari "Always Allow", this is silent.
-(async () => {
+// the user clicks Start. With Safari "Always Allow", this is silent. Exposed
+// as a Promise so autostart can await it — otherwise the autostart IIFE
+// races the warm-up and getUserMedia gets the default mic instead of the
+// saved BlackHole device.
+const warmupReady = (async () => {
   try {
     const warm = await navigator.mediaDevices.getUserMedia({ audio: true });
     warm.getTracks().forEach(t => t.stop());
@@ -340,6 +343,9 @@ const urlAutostart = params.get("autostart") === "1";
   meetingName = urlMeetingName ?? "Cairn";
   $meeting.textContent = meetingName === "Cairn" ? "Cairn" : `loop · ${meetingName}`;
   if (urlAutostart) {
+    // Wait for warm-up so currentDeviceId resolves from the saved label
+    // before getUserMedia fires.
+    await warmupReady;
     await startLiveSession();
   } else {
     $start.hidden = false;
