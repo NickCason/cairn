@@ -62,11 +62,17 @@ let savedSessionDir: string | null = null;
 let sessionState: "idle" | "recording" | "stopped" = "idle";
 
 // === Device picker ===
+// Safari rotates `deviceId` per session until getUserMedia has been called, so
+// we persist a label alongside the id and prefer the label-match on reload.
 function loadDeviceId(): string {
   return localStorage.getItem("cairn.deviceId") ?? "default";
 }
-function saveDeviceId(id: string) {
+function loadDeviceLabel(): string | null {
+  return localStorage.getItem("cairn.deviceLabel");
+}
+function saveDevice(id: string, label: string) {
   localStorage.setItem("cairn.deviceId", id);
+  if (label) localStorage.setItem("cairn.deviceLabel", label);
 }
 let currentDeviceId = loadDeviceId();
 
@@ -74,7 +80,7 @@ async function refreshDeviceList() {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const inputs = devices.filter(d => d.kind === "audioinput");
-    const prevValue = currentDeviceId;
+    const savedLabel = loadDeviceLabel();
     $devicePicker.innerHTML = "";
     const defaultOpt = document.createElement("option");
     defaultOpt.value = "default";
@@ -83,23 +89,45 @@ async function refreshDeviceList() {
     for (const d of inputs) {
       const opt = document.createElement("option");
       opt.value = d.deviceId;
-      // Label may be empty before mic permission is granted; show fallback.
       opt.textContent = d.label || `Device ${d.deviceId.slice(0, 6)}`;
       $devicePicker.appendChild(opt);
     }
-    // Restore selection if still present, otherwise fall back to default
-    const exists = Array.from($devicePicker.options).some(o => o.value === prevValue);
-    $devicePicker.value = exists ? prevValue : "default";
+    // Prefer label match (survives Safari deviceId rotation); fall back to
+    // previous id match; then default.
+    const labelMatch = savedLabel ? inputs.find(d => d.label === savedLabel) : undefined;
+    if (labelMatch) {
+      $devicePicker.value = labelMatch.deviceId;
+    } else {
+      const exists = Array.from($devicePicker.options).some(o => o.value === currentDeviceId);
+      $devicePicker.value = exists ? currentDeviceId : "default";
+    }
     currentDeviceId = $devicePicker.value;
+    const selectedOpt = $devicePicker.options[$devicePicker.selectedIndex];
+    if (selectedOpt && selectedOpt.textContent && !selectedOpt.textContent.startsWith("Device ")) {
+      saveDevice(currentDeviceId, selectedOpt.textContent);
+    }
   } catch (err) {
     console.warn("enumerateDevices failed:", err);
   }
 }
 refreshDeviceList();
 
+// Warm-up mic permission so deviceIds stabilize and labels populate before
+// the user clicks Start. With Safari "Always Allow", this is silent.
+(async () => {
+  try {
+    const warm = await navigator.mediaDevices.getUserMedia({ audio: true });
+    warm.getTracks().forEach(t => t.stop());
+    await refreshDeviceList();
+  } catch {
+    // permission not yet granted — refreshDeviceList re-runs after Start.
+  }
+})();
+
 $devicePicker.onchange = async () => {
   currentDeviceId = $devicePicker.value;
-  saveDeviceId(currentDeviceId);
+  const opt = $devicePicker.options[$devicePicker.selectedIndex];
+  saveDevice(currentDeviceId, opt?.textContent ?? "");
   // If a session is currently capturing, restart audio with the new device
   if (stopAudio && ws) {
     const oldStop = stopAudio;
