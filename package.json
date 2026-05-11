@@ -4,8 +4,7 @@
   "description": "Live meeting transcription with speaker diarization (webapp)",
   "scripts": {
     "build": "tsc -p tsconfig.renderer.json",
-    "deploy": "npm run build && bash scripts/deploy-ui.sh",
-    "test:benchmark": "npm run build && node tests/test-runner.spec.mjs"
+    "deploy": "npm run build && bash scripts/deploy-ui.sh"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
