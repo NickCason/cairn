@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
 # cairn-loop.sh — one e2e test iteration of Cairn against a YouTube URL.
 #
-# Quits Safari, starts Cairn recording via the control endpoint, opens
-# Safari at the given URL (with autoplay-friendly behavior), sleeps for
-# the duration, stops Cairn, snapshots the transcript, runs the grader,
-# prints a summary line.
+# Opens the Cairn webapp in Safari, starts a recording session via the
+# control endpoint, opens a second Safari window at the YouTube URL (with
+# autoplay-friendly behavior), sleeps for the duration, stops Cairn,
+# snapshots the transcript, runs the grader, prints a summary line.
 
 set -euo pipefail
 
 URL="${URL:-https://www.youtube.com/watch?v=ugvHCXCOmm4&t=194s}"
 DURATION="${DURATION:-600}"
 OUT_BASE="${OUT_BASE:-/tmp/cairn-test-runs}"
-CONTROL_HOST="${CONTROL_HOST:-127.0.0.1}"
-CONTROL_PORT="${CONTROL_PORT:-8765}"
+CTRL="${CTRL:-https://precision-node4.taild99f50.ts.net}"
 REFERENCE="${REFERENCE:-$(dirname "$0")/fixtures/dario-reference-v2.json}"
+
+TS="$(date +%Y%m%d-%H%M%S)"
+MEETING_NAME="${MEETING_NAME:-loop-$TS}"
 
 usage() {
   cat <<EOF
@@ -24,7 +26,7 @@ Defaults:
   --duration  $DURATION (seconds)
   --out       $OUT_BASE/run-<timestamp>
 
-Env overrides: URL, DURATION, OUT_BASE, CONTROL_HOST, CONTROL_PORT, REFERENCE
+Env overrides: URL, DURATION, OUT_BASE, CTRL, MEETING_NAME, REFERENCE
 EOF
 }
 
@@ -38,42 +40,42 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-TS="$(date +%Y%m%d-%H%M%S)"
 OUT="$OUT_BASE/run-$TS"
 mkdir -p "$OUT"
 
-CTRL="http://${CONTROL_HOST}:${CONTROL_PORT}"
-
 log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
 
-# 1. Quit any running Cairn + Safari for a clean state each iteration.
-log "quitting any running Cairn + Safari"
-osascript -e 'tell application "Cairn" to quit' 2>/dev/null || true
+# 1. Quit any running Safari for a clean state each iteration.
+log "quitting any running Safari"
 osascript -e 'tell application "Safari" to quit' 2>/dev/null || true
 sleep 3
-pkill -9 -f 'Cairn.app/Contents/MacOS' 2>/dev/null || true
 pkill -9 Safari 2>/dev/null || true
 sleep 1
 
-# 2. Launch Cairn (it auto-starts a recording session — we use that session,
-# we do not stop+restart it).
-log "launching Cairn"
-open -a Cairn
+# 2. POST /control/start so the server flips state to starting, then open the
+# Cairn webapp in Safari with ?meeting_name + ?autostart=1. The renderer's
+# IIFE calls startLiveSession(), WS handshake fires, server flips to recording.
+log "POST /control/start (meeting_name=$MEETING_NAME)"
+curl -fsS -X POST -H 'Content-Type: application/json' \
+  -d "{\"meeting_name\":\"$MEETING_NAME\"}" \
+  "$CTRL/control/start" > "$OUT/start-resp.json" || true
+
+log "opening Cairn webapp in Safari"
+open -a Safari "https://precision-node4.taild99f50.ts.net/?meeting_name=$MEETING_NAME&autostart=1"
+sleep 3
+
+# 3. Poll /control/status until state becomes recording (up to 20s).
+log "waiting for state=recording (max 20s)"
 deadline=$((SECONDS + 20))
-until curl -fsS --max-time 1 "$CTRL/control/status" > /dev/null 2>&1; do
-  (( SECONDS < deadline )) || { log "ERROR: control endpoint $CTRL/control/status not reachable in 20s"; exit 2; }
+until [[ "$(curl -fsS --max-time 2 "$CTRL/control/status" 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin).get("state",""))' 2>/dev/null)" == "recording" ]]; do
+  (( SECONDS < deadline )) || { log "ERROR: state did not reach recording in 20s"; exit 2; }
   sleep 1
 done
-log "control endpoint OK"
+log "state=recording"
 
-# 3. 2-second gap after Cairn is up, before opening YouTube
-# (lets Cairn fully render before Safari is launched alongside).
-sleep 2
-
-# 4. Open Safari at the URL.
+# 4. Open Safari at the YouTube URL (opens as window 2 behind the webapp).
 # Notes:
 #   - Stage Manager interferes; assumes it's disabled.
-#   - YouTube autoplay needs a user-gesture-feeling keystroke after page load.
 #   - Window coordinates are in POINTS (not pixels). Query Finder desktop
 #     bounds for the actual point dimensions; fall back to 1920x1200.
 log "opening Safari at $URL"
@@ -88,19 +90,17 @@ SCREEN_W="${SCREEN_W:-1920}"
 SCREEN_H="${SCREEN_H:-1200}"
 HALF_W=$((SCREEN_W / 2))
 WIN_H=$((SCREEN_H - 25))
-log "positioning Safari left, Cairn right (display ${SCREEN_W}x${SCREEN_H} points)"
+log "positioning webapp right (window 1), YouTube left (window 2) (display ${SCREEN_W}x${SCREEN_H} points)"
 osascript >/dev/null 2>&1 <<OSA || true
 tell application "System Events"
     tell process "Safari"
-        if (count of windows) > 0 then
-            set position of window 1 to {0, 25}
-            set size of window 1 to {${HALF_W}, ${WIN_H}}
-        end if
-    end tell
-    tell process "Cairn"
-        if (count of windows) > 0 then
+        if (count of windows) >= 1 then
             set position of window 1 to {${HALF_W}, 25}
             set size of window 1 to {${HALF_W}, ${WIN_H}}
+        end if
+        if (count of windows) >= 2 then
+            set position of window 2 to {0, 25}
+            set size of window 2 to {${HALF_W}, ${WIN_H}}
         end if
     end tell
 end tell
@@ -134,22 +134,20 @@ while :; do
   sleep 2
 done
 
-# 9.5 Wait for final_summary to land in the saved transcript.jsonl. The
-# server emits it after the LLM finishes; the renderer writes it to the
-# session dir. Poll the most-recent session's transcript.jsonl for the
-# final_summary line.
+# 9.5 Wait for final_summary to land in the saved transcript.jsonl on node4.
+# Sessions live on node4 at $SESS_DIR; poll via SSH.
 SESS_DIR="$(curl -fsS "$CTRL/control/status" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("session_dir",""))')"
-if [[ -n "$SESS_DIR" && -d "$SESS_DIR" ]]; then
-  log "waiting for final_summary in $SESS_DIR/transcript.jsonl (max 300s)"
+if [[ -n "$SESS_DIR" ]]; then
+  log "waiting for final_summary in $SESS_DIR/transcript.jsonl on node4 (max 300s)"
   deadline=$((SECONDS + 300))
-  until grep -q '"type":"final_summary"' "$SESS_DIR/transcript.jsonl" 2>/dev/null; do
+  until ssh nick@100.99.99.72 "grep -q '\"type\":\"final_summary\"' '$SESS_DIR/transcript.jsonl' 2>/dev/null"; do
     (( SECONDS < deadline )) || { log "WARN: final_summary not seen in 300s; continuing"; break; }
     sleep 2
   done
-  if grep -q '"type":"final_summary"' "$SESS_DIR/transcript.jsonl" 2>/dev/null; then
+  if ssh nick@100.99.99.72 "grep -q '\"type\":\"final_summary\"' '$SESS_DIR/transcript.jsonl' 2>/dev/null"; then
     log "final_summary present"
   fi
-  cp "$SESS_DIR/transcript.jsonl" "$OUT/session.jsonl" 2>/dev/null || true
+  scp "nick@100.99.99.72:$SESS_DIR/transcript.jsonl" "$OUT/session.jsonl" 2>/dev/null || true
 fi
 
 # 10. Snapshot transcript.
