@@ -29,7 +29,7 @@ export async function startLiveCapture(
   const ctx = new AudioContext();
   // Worklet file is served from the same dir as index.html (renderer/).
   // audio-worklet.js sits next to index.html (sibling relative URL).
-  await ctx.audioWorklet.addModule("audio-worklet.js");
+  await ctx.audioWorklet.addModule("/assets/audio-worklet.js");
   const source = ctx.createMediaStreamSource(stream);
   const node = new AudioWorkletNode(ctx, "cairn-pcm");
 
