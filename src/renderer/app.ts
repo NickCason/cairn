@@ -317,5 +317,7 @@ const urlAutostart = params.get("autostart") === "1";
   $meeting.textContent = meetingName === "Cairn" ? "Cairn" : `loop · ${meetingName}`;
   if (urlAutostart) {
     await startLiveSession();
+  } else {
+    $start.hidden = false;
   }
 })();
