@@ -4,7 +4,7 @@ import { SpeakersPanel } from "./speakers.js";
 import { handleRollingSummary, handleRollingReplace, handleFinalSummary, redrawSummaries, resetSummaryCache } from "./summary.js";
 import { substituteSpeakerVariants } from "./speaker-substitute.js";
 
-const CAIRN_SVC_URL = "ws://100.99.99.72:8300/ws/transcribe";
+const CAIRN_SVC_URL = `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws/transcribe`;
 
 declare global { interface Window {
   cairn: {
@@ -28,7 +28,11 @@ const speakers = new SpeakersPanel(document.getElementById("speakers")!, (s) => 
     // WS is closed; rewrite the saved file in place by re-calling saveSession
     // with the baked events. The IPC handler already overwrites the file.
     const baked = bakeNamesIntoEvents(eventsLog, speakers.list().map((sp) => ({ id: sp.id, name: sp.name })));
-    void window.cairn.saveSession(meetingName, baked);
+    void fetch("/sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ meeting_name: meetingName, events: baked }),
+    });
   }
 });
 const transcript = new TranscriptView(document.getElementById("transcript-lines")!, {
@@ -57,7 +61,7 @@ const $transcriptLines = document.getElementById("transcript-lines");
 const $finalSummary = document.getElementById("final-summary");
 
 (async () => {
-  const svgRes = await fetch("../icons/cairn.svg");
+  const svgRes = await fetch("/assets/icons/cairn.svg");
   $logo.innerHTML = await svgRes.text();
 })();
 
@@ -235,8 +239,14 @@ async function finalizeSession() {
   $stop.hidden = true;
   if (elapsedTimer) clearInterval(elapsedTimer);
   const baked = bakeNamesIntoEvents(eventsLog, speakers.list().map((s) => ({ id: s.id, name: s.name })));
-  const dir = await window.cairn.saveSession(meetingName, baked);
-  savedSessionDir = dir;
+  const res = await fetch("/sessions", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ meeting_name: meetingName, events: baked }),
+  });
+  const { session_dir } = await res.json();
+  savedSessionDir = session_dir;
+  const dir = session_dir;
   sessionState = "stopped";
   $status.textContent = `saved → ${dir.split("/").slice(-1)[0]}`;
   window.cairnControl?.reportState({ state: "stopped", session_dir: dir });
