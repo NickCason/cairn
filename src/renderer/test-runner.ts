@@ -25,7 +25,9 @@ export async function streamWavFile(
   send: (chunk: ArrayBuffer) => void,
   playbackSpeed: number = DEFAULT_PLAYBACK_SPEED,
 ): Promise<void> {
-  const data: any = await window.cairn.readFile(path);  // Buffer (Node) -> Uint8Array
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore — Electron-only IPC; file is dead in webapp mode (removed in T18)
+  const data: any = await (window as any).cairn.readFile(path);  // Buffer (Node) -> Uint8Array
   const ab: ArrayBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
   const { samples, sampleRate } = parseWav(ab);
   if (sampleRate !== SAMPLE_RATE) {

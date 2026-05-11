@@ -6,19 +6,6 @@ import { substituteSpeakerVariants } from "./speaker-substitute.js";
 
 const CAIRN_SVC_URL = `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws/transcribe`;
 
-declare global { interface Window {
-  cairn: {
-    onInit:(cb:(d:any)=>void)=>void;
-    readFile:(p:string)=>Promise<Buffer>;
-    saveSession:(name:string, events:any[])=>Promise<string>;
-  };
-  cairnControl?: {
-    onControlStart: (handler: (payload: { meeting_name: string }) => void) => void;
-    onControlStop: (handler: () => void) => void;
-    reportState: (state: object) => void;
-    reportTranscript: (rows: any[]) => void;
-  };
-} }
 
 const speakers = new SpeakersPanel(document.getElementById("speakers")!, (s) => {
   transcript.applySpeaker(s.id, s.name, s.color);
@@ -71,9 +58,6 @@ let elapsedTimer: number | null = null;
 let meetingName = "Cairn";
 let eventsLog: any[] = [];
 let stopAudio: (() => Promise<void>) | null = null;
-let demoModeActive: string | null = null;
-let isLiveMode = false;
-let isBenchmarkMode = false;
 let savedSessionDir: string | null = null;
 let sessionState: "idle" | "recording" | "stopped" = "idle";
 
@@ -140,7 +124,6 @@ function onMsg(m: ServerMsg) {
   else if (m.type === "transcript_final") {
     const sp = speakers.get(m.speaker_id);
     transcript.final(m as TranscriptFinal, { name: sp.name, color: sp.color });
-    reportTranscriptSnapshot();
   } else if (m.type === "speaker_assigned") {
     speakers.add(m.speaker_id, m.color_hint);
   } else if (m.type === "rolling_summary") {
@@ -156,13 +139,12 @@ function onMsg(m: ServerMsg) {
   } else if (m.type === "speaker_relabel") {
     const dst = speakers.get(m.speaker_id);
     transcript.relabelLine(m.seq, m.speaker_id, dst.name, dst.color);
-    reportTranscriptSnapshot();
   } else if (m.type === "transcript_split") {
     transcript.splitLine(m.original_seq, m.rows, (id) => speakers.get(id));
-    reportTranscriptSnapshot();
+  } else if ((m as any).type === "control_stop") {
+    stopLiveSession();
   } else if (m.type === "ack" && m.of === "start") {
     sessionState = "recording";
-    window.cairnControl?.reportState({ state: "recording", meeting_name: meetingName });
     started = Date.now();
     elapsedTimer = window.setInterval(() => {
       if (!started) return;
@@ -249,16 +231,8 @@ async function finalizeSession() {
   const dir = session_dir;
   sessionState = "stopped";
   $status.textContent = `saved → ${dir.split("/").slice(-1)[0]}`;
-  window.cairnControl?.reportState({ state: "stopped", session_dir: dir });
 
-  if (demoModeActive || isBenchmarkMode) {
-    // benchmark / demo: close the window so the test runner / recording can finish
-    const dwell = demoModeActive ? 5000 : 1500;
-    setTimeout(() => window.close(), dwell);
-    return;
-  }
-
-  // Live mode: keep the window open, allow restart
+  // Keep the window open, allow restart
   $start.hidden = false;
   $start.disabled = false;
   $start.textContent = "Start";
@@ -325,25 +299,6 @@ async function startLiveSession() {
 
 $start.onclick = () => { startLiveSession(); };
 
-// ── HTTP control bridge ────────────────────────────────────────────────────
-// Push a snapshot of the in-memory transcript rows to the main process so
-// the HTTP /control/transcript endpoint stays current.
-function reportTranscriptSnapshot() {
-  window.cairnControl?.reportTranscript(transcript.snapshot());
-}
-
-const ctrl = window.cairnControl;
-if (ctrl) {
-  ctrl.onControlStart(({ meeting_name }: { meeting_name: string }) => {
-    meetingName = meeting_name;
-    startLiveSession();
-  });
-  ctrl.onControlStop(() => {
-    stopLiveSession();
-  });
-}
-// ──────────────────────────────────────────────────────────────────────────
-
 $viewTranscript?.addEventListener("click", () => {
   if ($transcriptLines) $transcriptLines.hidden = false;
   if ($finalSummary) $finalSummary.hidden = true;
@@ -353,46 +308,14 @@ $viewSummary?.addEventListener("click", () => {
   if ($finalSummary) $finalSummary.hidden = false;
 });
 
-window.cairn.onInit(async ({ testFile, screenshotMode, demoMode }: { testFile: string|null; screenshotMode?: string|null; demoMode?: string|null }) => {
-  // Screenshot fixture mode: skip WebSocket entirely, populate with fake data
-  if (screenshotMode) {
-    meetingName = "vendor-sync";
-    $status.textContent = "live · recording";
-    const { loadFixture } = await import("./screenshot-fixture.js");
-    loadFixture(onMsg, $elapsed, $meeting, $recdot, $stop);
-    return;
+const params = new URLSearchParams(location.search);
+const urlMeetingName = params.get("meeting_name");
+const urlAutostart = params.get("autostart") === "1";
+
+(async () => {
+  meetingName = urlMeetingName ?? "Cairn";
+  $meeting.textContent = meetingName === "Cairn" ? "Cairn" : `loop · ${meetingName}`;
+  if (urlAutostart) {
+    await startLiveSession();
   }
-
-  if (demoMode) demoModeActive = demoMode;
-
-  isBenchmarkMode = !!testFile;
-  isLiveMode = !testFile;
-  meetingName = testFile ? "benchmark-four-speaker" : "live";
-  $meeting.textContent = testFile
-    ? `benchmark · ${testFile.split("/").pop()}`
-    : `Cairn`;
-  ws = new CairnWS(CAIRN_SVC_URL, onMsg, (s) => $status.textContent = s);
-  await ws.connect();
-  ws.start(meetingName);
-
-  if (testFile) {
-    const { streamWavFile } = await import("./test-runner.js");
-    const speed = demoMode ? 1.0 : 2.0;
-    await streamWavFile(testFile, (buf: ArrayBuffer) => ws!.sendAudio(buf), speed);
-    setTimeout(() => ws?.stop(), 6000);
-  } else {
-    // Live mode: capture from selected input device, stream PCM chunks to n4.
-    const { startLiveCapture } = await import("./audio.js");
-    try {
-      stopAudio = await startLiveCapture(
-        (chunk: ArrayBuffer) => ws!.sendAudio(chunk),
-        (err: Error) => { $status.textContent = `mic error: ${err.message}`; },
-        currentDeviceId,
-      );
-      // Re-enumerate now that permission is granted (labels become readable)
-      refreshDeviceList();
-    } catch (err) {
-      console.error("live capture failed:", err);
-    }
-  }
-});
+})();
