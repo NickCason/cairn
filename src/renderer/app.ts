@@ -102,10 +102,6 @@ async function refreshDeviceList() {
       $devicePicker.value = exists ? currentDeviceId : "default";
     }
     currentDeviceId = $devicePicker.value;
-    const selectedOpt = $devicePicker.options[$devicePicker.selectedIndex];
-    if (selectedOpt && selectedOpt.textContent && !selectedOpt.textContent.startsWith("Device ")) {
-      saveDevice(currentDeviceId, selectedOpt.textContent);
-    }
   } catch (err) {
     console.warn("enumerateDevices failed:", err);
   }
