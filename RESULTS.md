@@ -59,3 +59,19 @@ Qwen 3.6 35B-A3B via Ollama on the P4000 node offered mixed utility for the Cair
 - **Live mode untested:** BlackHole 2ch is installed; live microphone input path compiles and links but was not exercised. Would need `getUserMedia` + `AudioWorklet` wiring.
 - **Diarization backend:** pyannote.audio 3.3.1 (CPU, end-to-end neural) is now the current backend. Required pinning `huggingface-hub<1.0` (the `use_auth_token` shim was removed in v1.0), `numpy<2.0`, `torchaudio<2.9`, and a runtime monkey-patch for `torch.load(weights_only=True)`. See `docs/superpowers/specs/2026-05-08-cairn-pyannote-reintegration.md` in the fleet repo for the post-mortem.
 - **steeLL-v1 (qwen3.6:35b-a3b):** P4000 throughput (~5 tok/s) makes it impractical for interactive debugging. Useful for first-draft boilerplate on isolated tasks.
+
+## 2026-05-11 — Webapp cutover regression run
+
+| Run | fixture | bleed_rate | finals (gradeable/total) | notes |
+|-----|---------|------------|--------------------------|-------|
+| baseline (pre-cutover, Electron) | diamandis-220 (3-speaker) | 12.1% | per memory `project_streaming_defers_to_auth.md` | turn-only metric, ~10% rows stuck on S? |
+| post-cutover webapp on node4    | diamandis-220 (3-speaker) | 28.9% (24/83) | 83/86 | All 24 bleeds have `cairn_speaker: "S?"` — S?-stuck pathology elevated |
+
+**Read:** the regression is entirely concentrated in the known "rows stuck on S? after stop" pathology — no new misattribution. From the grader's `bleeds` array, every bleed has `cairn_speaker: "S?"`, meaning the speaker never got assigned, not that it was assigned wrong. Single-run variance is high; two-three additional runs would clarify whether the elevated S?-stuck rate is a real regression or run noise.
+
+**Cutover-specific observations from this run:**
+- Webapp HTTPS endpoint at `https://precision-node4.taild99f50.ts.net/` serves the renderer correctly under Safari.
+- Initial bug: autostart IIFE raced the module-scope mic warm-up — `getUserMedia` opened built-in mic instead of saved BlackHole device. Fixed at SHA after T17 by making autostart `await warmupReady`.
+- Initial bug: device persistence in Safari was clobbered by `refreshDeviceList` re-saving on every call before the warm-up had populated labels. Fixed by persisting only on explicit `onchange`.
+- Harness wart: final_summary poll regex `'"type":"final_summary"'` doesn't match server's actual emission `'"type": "final_summary"'` (space after colon). Polling timed out at 300s but the line was in the file the whole time. Follow-up: make the harness pattern lenient.
+- UX wart: rolling summary appears to update in-place rather than append, even when multiple `rolling_summary` events fire. (1 `rolling_summary` + 3 `rolling_summary_replace` in this session's saved transcript.) May be by-design but warrants a renderer trace.
