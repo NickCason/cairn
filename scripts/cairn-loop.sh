@@ -106,19 +106,13 @@ tell application "System Events"
 end tell
 OSA
 
-# Bring the webapp window to front. YouTube continues playing audio in the
-# background (Safari keeps backgrounded-tab audio alive), but the webapp tab
-# stays foreground so Safari does not throttle its JS. Without this, the
-# renderer's WebSocket handler suspends during long sessions and the on-stop
-# relabel batch never gets processed — see RESULTS.md 2026-05-11 v6 entry.
-osascript >/dev/null 2>&1 <<OSA || true
-tell application "Safari"
-    activate
-    if (count of windows) >= 1 then
-        set index of window 1 to 1
-    end if
-end tell
-OSA
+# Bring the webapp tab to foreground via a re-open. Without focus, Safari
+# throttles JS in backgrounded tabs after ~30s and the renderer's WebSocket
+# handler suspends — the on-stop relabel batch then never gets processed.
+# `open -a Safari <url>` on an already-open URL focuses that tab without
+# reloading. YouTube continues playing audio in the background unchanged.
+sleep 1
+open -a Safari "https://precision-node4.taild99f50.ts.net/?meeting_name=$MEETING_NAME&autostart=1"
 
 # YouTube autoplays the cued URL on its own. Don't send a play keystroke
 # here — that toggles play/pause, and if autoplay already fired it pauses

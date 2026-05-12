@@ -145,8 +145,16 @@ $devicePicker.onchange = async () => {
   }
 };
 
+let _msgCounts: Record<string, number> = {};
+let _lastDiagFlush = 0;
 function onMsg(m: ServerMsg) {
   eventsLog.push({ ...m, _recv_ts: Date.now() });
+  _msgCounts[m.type] = (_msgCounts[m.type] ?? 0) + 1;
+  const now = Date.now();
+  if (now - _lastDiagFlush > 5000) {
+    diag("msg_counts", { ..._msgCounts });
+    _lastDiagFlush = now;
+  }
   if (m.type === "transcript_partial") transcript.partial(m as TranscriptPartial);
   else if (m.type === "transcript_final") {
     const sp = speakers.get(m.speaker_id);
@@ -170,10 +178,21 @@ function onMsg(m: ServerMsg) {
   } else if (m.type === "speaker_relabel") {
     const dst = speakers.get(m.speaker_id);
     transcript.relabelLine(m.seq, m.speaker_id, dst.name, dst.color);
+  } else if (m.type === "speaker_relabel_batch") {
+    for (const r of m.relabels) {
+      const dst = speakers.get(r.speaker_id);
+      transcript.relabelLine(r.seq, r.speaker_id, dst.name, dst.color);
+    }
   } else if (m.type === "transcript_split") {
     transcript.splitLine(m.original_seq, m.rows, (id) => speakers.get(id));
+  } else if (m.type === "transcript_split_batch") {
+    for (const sp of m.splits) {
+      transcript.splitLine(sp.original_seq, sp.rows, (id) => speakers.get(id));
+    }
   } else if ((m as any).type === "control_stop") {
     stopLiveSession();
+  } else if ((m as any).type === "heartbeat") {
+    /* server keepalive during long pyannote pauses — ignore */
   } else if (m.type === "ack" && m.of === "start") {
     sessionState = "recording";
     started = Date.now();
@@ -188,9 +207,18 @@ function onMsg(m: ServerMsg) {
     $stop.textContent = "Stop";
     $start.hidden = true;
   } else if (m.type === "ack" && m.of === "stop") {
+    diag("ack_of_stop_received", { eventsLogLen: eventsLog.length, hasFinalSummary: eventsLog.some(e => e.type === "final_summary") });
     $status.textContent = "summarizing…";
     finalizeSession();
   }
+}
+
+function diag(stage: string, info: Record<string, unknown> = {}) {
+  void fetch("/control/diag", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ stage, ts: Date.now(), ...info }),
+  }).catch(() => { /* best-effort */ });
 }
 
 // Re-save the session after a late-arriving final_summary or summary
@@ -241,27 +269,33 @@ function bakeNamesIntoEvents(events: any[], registry: { id: string; name: string
 
 let finalizingInFlight = false;
 async function finalizeSession() {
-  if (finalizingInFlight) return;
+  diag("finalize_enter", { finalizingInFlight, eventsLogLen: eventsLog.length });
+  if (finalizingInFlight) { diag("finalize_skip_inflight"); return; }
   finalizingInFlight = true;
   $recdot.hidden = true;
   $stop.hidden = true;
   if (elapsedTimer) clearInterval(elapsedTimer);
   try {
+    diag("finalize_baking", { speakerCount: speakers.list().length });
     const baked = bakeNamesIntoEvents(eventsLog, speakers.list().map((s) => ({ id: s.id, name: s.name })));
+    diag("finalize_fetch_starting", { bakedLen: baked.length });
     const res = await fetch("/sessions", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ meeting_name: meetingName, events: baked }),
     });
+    diag("finalize_fetch_returned", { status: res.status, ok: res.ok });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const { session_dir } = await res.json();
     savedSessionDir = session_dir;
     sessionState = "stopped";
     $status.textContent = `saved → ${session_dir.split("/").slice(-1)[0]}`;
+    diag("finalize_done", { session_dir });
   } catch (err) {
     console.error("finalizeSession failed:", err);
     $status.textContent = `save failed: ${(err as Error).message}`;
     sessionState = "stopped";
+    diag("finalize_error", { message: (err as Error).message });
   } finally {
     finalizingInFlight = false;
     $start.hidden = false;

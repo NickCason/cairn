@@ -25,7 +25,17 @@ export interface TranscriptSplitMsg {
   rows: SplitRow[];
 }
 
-export type ServerMsg = TranscriptPartial | TranscriptFinal | SpeakerAssigned | SpeakerMerge | SpeakerRelabel | Ack | ErrorMsg | RollingSummaryMsg | RollingReplaceMsg | FinalSummaryMsg | TranscriptSplitMsg;
+export interface SpeakerRelabelBatchMsg {
+  type: "speaker_relabel_batch";
+  relabels: SpeakerRelabel[];
+}
+
+export interface TranscriptSplitBatchMsg {
+  type: "transcript_split_batch";
+  splits: TranscriptSplitMsg[];
+}
+
+export type ServerMsg = TranscriptPartial | TranscriptFinal | SpeakerAssigned | SpeakerMerge | SpeakerRelabel | Ack | ErrorMsg | RollingSummaryMsg | RollingReplaceMsg | FinalSummaryMsg | TranscriptSplitMsg | SpeakerRelabelBatchMsg | TranscriptSplitBatchMsg;
 
 export class CairnWS {
   private ws: WebSocket | null = null;
@@ -34,9 +44,20 @@ export class CairnWS {
     return new Promise<void>((resolve, reject) => {
       this.ws = new WebSocket(this.url);
       this.ws.binaryType = "arraybuffer";
-      this.ws.onopen = () => { this.onStatus("connected"); resolve(); };
-      this.ws.onclose = () => this.onStatus("disconnected");
-      this.ws.onerror = (e) => { this.onStatus("error"); reject(e); };
+      this.ws.onopen = () => {
+        this.onStatus("connected");
+        void fetch("/control/diag", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stage: "ws_open", ts: Date.now() }) }).catch(() => {});
+        resolve();
+      };
+      this.ws.onclose = (e) => {
+        this.onStatus("disconnected");
+        void fetch("/control/diag", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stage: "ws_close", ts: Date.now(), code: e.code, reason: e.reason, wasClean: e.wasClean }) }).catch(() => {});
+      };
+      this.ws.onerror = (e) => {
+        this.onStatus("error");
+        void fetch("/control/diag", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stage: "ws_error", ts: Date.now() }) }).catch(() => {});
+        reject(e);
+      };
       this.ws.onmessage = (e) => {
         if (typeof e.data === "string") {
           try { this.onMsg(JSON.parse(e.data) as ServerMsg); } catch (err) { console.error("bad msg", err); }
