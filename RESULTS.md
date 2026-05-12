@@ -75,3 +75,22 @@ Qwen 3.6 35B-A3B via Ollama on the P4000 node offered mixed utility for the Cair
 - Initial bug: device persistence in Safari was clobbered by `refreshDeviceList` re-saving on every call before the warm-up had populated labels. Fixed by persisting only on explicit `onchange`.
 - Harness wart: final_summary poll regex `'"type":"final_summary"'` doesn't match server's actual emission `'"type": "final_summary"'` (space after colon). Polling timed out at 300s but the line was in the file the whole time. Follow-up: make the harness pattern lenient.
 - UX wart: rolling summary appears to update in-place rather than append, even when multiple `rolling_summary` events fire. (1 `rolling_summary` + 3 `rolling_summary_replace` in this session's saved transcript.) May be by-design but warrants a renderer trace.
+
+## 2026-05-11 — Lex #418 (5 speakers, new fixture)
+
+First run against the new 5-speaker stress fixture (`israel-palestine-reference.json`). 10-min slice starting at t=10200s (2:50:00) — dense window with all 5 speakers active.
+
+| metric | value |
+|---|---|
+| total_finals | 171 |
+| gradeable_finals | 171 (100% — auto-anchor worked, every final maps to a reference span) |
+| bleed_finals | 58 |
+| bleed_rate | 33.9% |
+| off_script_finals | 0 |
+| mode | time-only |
+
+**Read:** all 58 bleeds have `cairn_speaker: "S?"` — same known S?-stuck pathology as the 3-speaker diamandis-220 run. Server saved 80 `speaker_relabel` events for 171 finals, so 91/171 (53%) never got a real speaker ID. With more speakers, more clusters need time to settle and the on-stop auth pass apparently doesn't catch them all. **Zero off-script** is notable — Cairn captures all the content correctly; the problem is purely diarization labeling.
+
+Diarization detected 6 cluster IDs (fixture has 5 actual speakers; the 6th is likely overlap/silence). No baseline to compare against — this is the first run of this fixture.
+
+**Follow-on:** rerun N=3 to bound variance; investigate whether `speaker_relabel` rate scales sub-linearly with speaker count (which would mean S?-stuck % grows with N speakers, exactly what we observe: 12.1% → 29% → 53% for N=3→3→5).
