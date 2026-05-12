@@ -125,3 +125,69 @@ Multi-iteration fix landing across cairn-svc (node4) + renderer + harness. Trigg
 - VAD endpoint detection on rapid turn-taking — finals span 2 reference speakers
 - Cairn under-detects speaker count (4 vs 5 on Lex 418); could be pyannote `num_speakers` hint or clustering threshold tune
 - Harness final_summary regex `'"type":"final_summary"'` doesn't match server's `'"type": "final_summary"'` (space after colon)
+
+## 2026-05-12 — 5-speaker bleed reduction (Lex 418, 600s)
+
+Ten-iteration sweep on the Lex #418 5-speaker fixture, attacking the genuine
+row-segmentation bleed left over from the v2 chain. Strict word-level bleed
+(grader default: any cross-speaker word counts) **32.7% → 11.5%**. Clearly
+mixed-speaker rows (≥3 minority words) **4.4% → 1.5%**. Lex Fridman cluster
+finally emerges in iter 9 — first run on this fixture where the auto-detected
+cluster count matched all 5 distinct reference identities.
+
+| iter | settings | rows | strict | ≥2 minority | ≥3 minority |
+|------|----------|-----:|-------:|------------:|------------:|
+| baseline (v11) | max=12s, sil=500, agg=2 (defaults) | 162 | 32.7% | — | — |
+| 1 | num_speakers=5, max=6s, sil=250 | 191 | 24.1% | — | — |
+| 2 | max=3s, sil=150, agg=3, pad=100 | 260 | 17.7% | — | — |
+| 3 | max=2s | 339 | 15.6% | 9.7% | 4.4% |
+| 4 | num_speakers=6 (no Lex recovered, +duplicates) | 333 | 14.7% | 9.9% | 5.4% |
+| 5 | sil=100, commit=1 | 325 | 15.1% | 8.9% | 4.3% |
+| 6 | **no `num_speakers`** | 328 | 15.2% | 9.1% | 4.3% |
+| 7 | pyannote seg_thr=0.3, cluster_thr=0.55 | 328 | 16.2% | 6.7% | 4.3% |
+| 8 | + internal-silence-split = 250ms | 329 | 14.3% | 6.7% | 2.4% |
+| **9 (locked)** | **internal-silence-split = 100ms** | **331** | **11.5%** | **5.7%** | **1.5%** |
+| 10 | silence-split = 50ms (over-aggressive) | 326 | 12.6% | 7.4% | 2.5% |
+
+**Read:** the strict metric (count every cross-speaker word as bleed) bottoms
+out around 11–12% because of single-word edge jitter — words whose timestamp
+midpoints sit at the speaker turn boundary, where ±100ms of whisper word-time
+imprecision flips the assignment. In iter 9 those single-word bleeds all had
+**zero inter-word gap** to their neighbour — speakers transitioning without an
+audible pause. No tighter silence threshold can split them, and going to 50ms
+(iter 10) over-split same-speaker pauses and *worsened* both strict bleed and
+clustering (Lex was lost again). Iter 9 is the locked configuration.
+
+**Levers landed (cairn-svc commit `6739a58`):**
+
+1. **VAD env knobs** in `vad.py` (`CAIRN_VAD_*`). Production: `MAX_CHUNK_S=2.0`,
+   `MIN_SILENCE_MS=100`, `AGGRESSIVENESS=3`, `MIN_COMMIT_S=1.0`,
+   `TRAILING_PAD_MS=100`. Tighter chunking is the dominant lever for early
+   iterations (32.7%→15.6% in 3 changes).
+2. **Pyannote pipeline overrides** in `diarize.py` (`CAIRN_PYANNOTE_*`).
+   Production: `SEG_THRESHOLD=0.3`, `CLUSTER_THRESHOLD=0.55`. Lower segmentation
+   threshold catches briefer turn boundaries; lower clustering threshold allows
+   more distinct clusters (helps when speakers are acoustically similar).
+3. **Internal-silence row split** in `server.py` `_split_into_runs`
+   (`CAIRN_SPLIT_INTERNAL_SILENCE_MS=100`). Breaks a same-speaker run when
+   consecutive words are separated by ≥100ms — catches turn boundaries pyannote
+   merged into a single segment but where audible silence indicates a real
+   speaker change. **This was the iter-9 unlock** that took strict bleed from
+   16.2% (iter 7) down to 11.5%, and was the only change to surface the
+   5th-cluster (Lex Fridman) for the first time.
+
+**Levers explicitly rejected:**
+
+- **`num_speakers` hint**: introduced in iter 1 (=5) and tried at 6 in iter 4.
+  Removing it in iter 6 changed nothing on the metric. Cairn must auto-detect
+  speaker count; production builds never accept a count-hint setting.
+
+**Open follow-ons (genuine row-segmentation):**
+- Remaining strict bleed is dominated by zero-silence turn boundaries (mid-word
+  speaker transitions, overlap). Eliminating those would need re-segmenting
+  whisper word timestamps acoustically or switching to a model with tighter
+  word-timing (whisper-large-v3 vs distil-large-v3).
+- The grader's strict mode (any cross-speaker word) is harsher than the
+  industry-standard DER's 250ms collar; the `WORD_BLEED_MIN_MINORITY` knob
+  exists but is intentionally not relied on here — the goal was to make
+  phrases actually align with speaker turns, not loosen the metric.
