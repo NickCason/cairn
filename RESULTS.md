@@ -94,3 +94,34 @@ First run against the new 5-speaker stress fixture (`israel-palestine-reference.
 Diarization detected 6 cluster IDs (fixture has 5 actual speakers; the 6th is likely overlap/silence). No baseline to compare against — this is the first run of this fixture.
 
 **Follow-on:** rerun N=3 to bound variance; investigate whether `speaker_relabel` rate scales sub-linearly with speaker count (which would mean S?-stuck % grows with N speakers, exactly what we observe: 12.1% → 29% → 53% for N=3→3→5).
+
+## 2026-05-11 — Speaker assignment improvement (S?-stuck eradication)
+
+Multi-iteration fix landing across cairn-svc (node4) + renderer + harness. Trigger: post-cutover regression run revealed >50% of finals on Lex #418 stuck on `S?` because the on-stop auth pass only re-diarized the last 30s tail (since `last_auth_tick_s`), missing speakers who only spoke after the initial t=30s establishing pass.
+
+| run | bleed | gradeable | finals | finals stuck on S? | notes |
+|-----|-------|-----------|--------|-------------------|-------|
+| pre-fix (lex418 v1) | 33.9% | 171 | 171 | 100% of bleeds | server emits 139 individual relabel WS frames; renderer save fires fine |
+| stop=full-session (v4-v8) | n/a | n/a | hung | n/a | Safari WS dropped during 75s pyannote (uvicorn ping_timeout + tab throttling) |
+| + batching + heartbeat (v9 120s) | low | 36 | 36 | 0% | proves the fix chain works for short sessions |
+| + webapp refocus (v10) | 31.6% | 177 | 178 | 0% of saved (grader still saw S? due to stale snapshot) | finalize lands; snapshot bug surfaced |
+| + snapshot relabel-sync (v11) | 32.7% | 162 | 162 | 0% in snapshot too | grader now sees post-relabel SIDs; bleeds are real cross-boundary errors |
+
+**Final speaker distribution (v11, Lex 418):**
+- S2=49, S5=49, S4=30, S6=34 (4 SIDs, 1 short of reference 5)
+- Bleeds distributed across S2/S4/S5/S6 (no S? bias)
+- Remaining bleeds are genuine row-segmentation: one Cairn final contains words from 2 reference speakers due to VAD/endpoint behavior on dense turn-taking
+
+**Service commits (node4 local, no remote):**
+- `e04abbd` on-stop auth pass = full session
+- `044eb04` batch speaker_relabel + transcript_split on stop
+- `da1f5bd` keep WS warm during pyannote + sync snapshot with relabels
+- `c8bbc7c` (unrelated) llm_client strips markdown JSON fences
+
+**Mac repo commits (pushed `84dec65..8fe64b1`):**
+- `8fe64b1` renderer finalize fix + batch handlers + harness webapp refocus
+
+**Open follow-ons (genuine row-segmentation):**
+- VAD endpoint detection on rapid turn-taking — finals span 2 reference speakers
+- Cairn under-detects speaker count (4 vs 5 on Lex 418); could be pyannote `num_speakers` hint or clustering threshold tune
+- Harness final_summary regex `'"type":"final_summary"'` doesn't match server's `'"type": "final_summary"'` (space after colon)
