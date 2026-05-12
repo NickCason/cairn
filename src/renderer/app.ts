@@ -159,6 +159,10 @@ function onMsg(m: ServerMsg) {
     handleRollingReplace(m as any);
   } else if (m.type === "final_summary") {
     handleFinalSummary(m as any);
+    // If stop already finalized, persist the late-arriving summary.
+    if (sessionState === "stopped" && savedSessionDir) {
+      resaveSessionWithCurrentEvents();
+    }
   } else if (m.type === "speaker_merge") {
     const dstSpeaker = speakers.get(m.dst);
     speakers.merge(m.src, m.dst);
@@ -185,29 +189,21 @@ function onMsg(m: ServerMsg) {
     $start.hidden = true;
   } else if (m.type === "ack" && m.of === "stop") {
     $status.textContent = "summarizing…";
-    awaitFinalSummaryThenFinalize();
+    finalizeSession();
   }
 }
 
-// Wait for the server's final_summary (success or failure) before writing
-// transcript.jsonl, so the persisted log includes it. Falls back on a timeout
-// (server LLM is bounded by CAIRN_LLM_TIMEOUT_S + drain ≈ 90 + 30s, plus margin).
-let finalizing = false;
-function awaitFinalSummaryThenFinalize() {
-  if (finalizing) return;
-  finalizing = true;
-  const FINAL_WAIT_MS = 150_000;
-  const startedAt = Date.now();
-  const seen = () => eventsLog.some((e) => e.type === "final_summary");
-  const tick = () => {
-    if (seen() || Date.now() - startedAt > FINAL_WAIT_MS) {
-      finalizing = false;
-      finalizeSession();
-      return;
-    }
-    setTimeout(tick, 250);
-  };
-  tick();
+// Re-save the session after a late-arriving final_summary or summary
+// substitution lands post-stop. Without this, finalizeSession fires on ack
+// of stop and may miss summary events that arrive a few ms later.
+function resaveSessionWithCurrentEvents() {
+  if (!savedSessionDir) return;
+  const baked = bakeNamesIntoEvents(eventsLog, speakers.list().map((s) => ({ id: s.id, name: s.name })));
+  void fetch("/sessions", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ meeting_name: meetingName, events: baked }),
+  }).catch(() => { /* re-save is best-effort */ });
 }
 
 function bakeNamesIntoEvents(events: any[], registry: { id: string; name: string | null }[]): any[] {
@@ -243,27 +239,36 @@ function bakeNamesIntoEvents(events: any[], registry: { id: string; name: string
   });
 }
 
+let finalizingInFlight = false;
 async function finalizeSession() {
+  if (finalizingInFlight) return;
+  finalizingInFlight = true;
   $recdot.hidden = true;
   $stop.hidden = true;
   if (elapsedTimer) clearInterval(elapsedTimer);
-  const baked = bakeNamesIntoEvents(eventsLog, speakers.list().map((s) => ({ id: s.id, name: s.name })));
-  const res = await fetch("/sessions", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ meeting_name: meetingName, events: baked }),
-  });
-  const { session_dir } = await res.json();
-  savedSessionDir = session_dir;
-  const dir = session_dir;
-  sessionState = "stopped";
-  $status.textContent = `saved → ${dir.split("/").slice(-1)[0]}`;
-
-  // Keep the window open, allow restart
-  $start.hidden = false;
-  $start.disabled = false;
-  $start.textContent = "Start";
-  $clear.hidden = false;
+  try {
+    const baked = bakeNamesIntoEvents(eventsLog, speakers.list().map((s) => ({ id: s.id, name: s.name })));
+    const res = await fetch("/sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ meeting_name: meetingName, events: baked }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { session_dir } = await res.json();
+    savedSessionDir = session_dir;
+    sessionState = "stopped";
+    $status.textContent = `saved → ${session_dir.split("/").slice(-1)[0]}`;
+  } catch (err) {
+    console.error("finalizeSession failed:", err);
+    $status.textContent = `save failed: ${(err as Error).message}`;
+    sessionState = "stopped";
+  } finally {
+    finalizingInFlight = false;
+    $start.hidden = false;
+    $start.disabled = false;
+    $start.textContent = "Start";
+    $clear.hidden = false;
+  }
 }
 
 function clearTranscript() {
