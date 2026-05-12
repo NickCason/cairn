@@ -191,3 +191,68 @@ clustering (Lex was lost again). Iter 9 is the locked configuration.
   industry-standard DER's 250ms collar; the `WORD_BLEED_MIN_MINORITY` knob
   exists but is intentionally not relied on here — the goal was to make
   phrases actually align with speaker turns, not loosen the metric.
+
+## 2026-05-12 — Live diarization parity with on-stop pass + summary fix
+
+Two follow-on fixes after the iter-9 lockdown surfaced that
+*everything live was coming out as one speaker* even though the on-stop
+relabel cleaned it up afterwards:
+
+### Bug 1 — final summary inherited streaming-label bias
+
+On stop the establishing auth pass discovered S4/S5/S6 for the first
+time in the Lex 418 fixture (251 relabels covering most of the
+ledger). It enqueued a `resummarize` to re-run rolling entries against
+the corrected ledger. The stop branch then queued `final` on the same
+`SingleFlightQueue`, and `put(final)` clears all pending non-finals —
+so the relabel-driven resummarize was discarded and the final summary
+ran against rolling recaps still framed in terms of S2 + S?.
+
+Fix: stop branch now `await asyncio.wait_for(_wait_summary_queue_empty(…))`
+before queuing final. Final runs against the fully-relabeled ledger
+and the per-speaker breakdown lines up with detected SIDs.
+
+### Bug 2 — live diarization couldn't mint new SIDs mid-session
+
+`_authoritative_schedule` had a hardcoded 600s gap between
+establishing passes (only ones allowed to mint SIDs). On a 10-min
+session this fires at t=45s (audio too short for proper clustering)
+and again at stop — mid-session refresh passes are classify-only, so
+any speaker first heard after t=45s stayed `S?` for the rest of the
+recording. Live UX: one labeled speaker plus a wall of S?.
+
+Fix: `CAIRN_AUTH_DIAR_ESTABLISHING_INTERVAL_S` env (default 600s for
+back-compat, production 120s) makes the establishing pass cadence
+tunable. Iter 12 logs show establishing at t=42s, t=162s, t=282s, etc.
+— full-session re-clustering every two minutes, emitting relabels as
+new SIDs are minted.
+
+### Iter 12 result (locked production config)
+
+| metric | iter 9 (locked floor before fix) | iter 12 |
+|---|---|---|
+| total rows | 331 | 333 |
+| strict bleed | 11.5% | **9.3%** |
+| ≥2 minority words | 5.7% | **4.5%** ← under 5% |
+| ≥3 minority words | 1.5% | 2.1% |
+| final summary speakers covered | 1 (S2 only) | **4 (all detected)** |
+
+Bleed improvement is partly run-to-run variance (the Lex Fridman
+cluster was found in iter 9 but not iter 12), but the summary fix is
+the headline change. Settings (`~/cairn-svc/.env`):
+
+```
+CAIRN_VAD_MAX_CHUNK_S=2.0
+CAIRN_VAD_MIN_SILENCE_MS=100
+CAIRN_VAD_AGGRESSIVENESS=3
+CAIRN_VAD_TRAILING_PAD_MS=100
+CAIRN_VAD_MIN_COMMIT_S=1.0
+CAIRN_SPLIT_INTERNAL_SILENCE_MS=100
+CAIRN_AUTH_DIAR_ESTABLISHING_INTERVAL_S=120
+```
+
+`cairn-svc` commit `cb074da`. Pyannote `pipeline.instantiate()`
+overrides removed from `.env` after the iter-12 log revealed they were
+silently failing (`segmentation.threshold` is not an exposed
+hyperparameter on `pyannote/speaker-diarization-3.1`); the `diarize.py`
+override scaffolding stays in place for future params.
