@@ -74,7 +74,7 @@ python3 scripts/grade-transcript.py --transcript run.json --reference scripts/fi
 ```
 src/renderer/        the web client, index.html, style.css
 src/icons/           logo (SVG and PNG)
-scripts/             cairn-loop.sh, grade-transcript.py (+ test), build-reference*.py, deploy-ui.sh, fixtures/
+scripts/             cairn-loop.sh, grade-transcript.py (+ test), build-reference*.py, deploy-ui.sh, fixtures/ (reference transcripts, built locally, not committed)
 benchmarks/          script.json: ground truth for a synthetic four-speaker meeting (the audio is not in the repo)
 docs/superpowers/    design specs, implementation plans and a performance report
 RESULTS.md, ACCURACY.md   measurements and a comparison of diarization backends

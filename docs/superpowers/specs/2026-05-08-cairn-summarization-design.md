@@ -25,8 +25,8 @@ A separate Claude Code session is concurrently working on a **diarization fix** 
 - `tests/test_summarize.py`, `tests/test_llm_client.py` — new
 - `tests/fixtures/summarize/*.jsonl` — new (offline LLM-output fixtures)
 - `cairn-svc/.env.example` — additions only
-- Cairn client (`/Users/nickcason/dev/cairn/src/renderer/*`) — `app.ts`, `ws.ts`, `transcript.ts`, `index.html`, `style.css`; new `summary.ts`
-- Ollama deployment scripts on `aorus-node8` (no shared files with svc)
+- Cairn client (`~/dev/cairn/src/renderer/*`) — `app.ts`, `ws.ts`, `transcript.ts`, `index.html`, `style.css`; new `summary.ts`
+- Ollama deployment scripts on `media-host` (no shared files with svc)
 
 ### Files only diarization-fix touches
 Per the other agent's note: nothing exclusively theirs in cairn-svc beyond the changes captured above.
@@ -54,7 +54,7 @@ Add a meeting-summarization layer on top of Cairn's stable STT + diarization pip
 1. **Rolling delta recap** — every ~2 minutes during the meeting, a short bullet recap of what was new in that window is appended to a sidebar list. Reader is assumed to have seen earlier entries.
 2. **Final structured summary** — on Stop, a single structured artifact: TL;DR, per-speaker contributions, decisions, action items.
 
-Both are produced server-side by an LLM running on `aorus-node8` alongside Speaches.
+Both are produced server-side by an LLM running on `media-host` alongside Speaches.
 
 ## 2. Non-goals (Phase 1)
 
@@ -158,7 +158,7 @@ Both are produced server-side by an LLM running on `aorus-node8` alongside Speac
 
 ---
 
-## 5. LLM serving on aorus-node8
+## 5. LLM serving on media-host
 
 ### 5.1 Deployment
 
@@ -362,7 +362,7 @@ Existing replay path (which renders historic `transcript.jsonl`) is extended in 
 Added to `~/cairn-svc/.env` (and `.env.example`):
 
 ```
-CAIRN_LLM_URL=http://100.122.121.18:11434
+CAIRN_LLM_URL=http://<tailnet-ip>:11434
 CAIRN_LLM_MODEL=qwen2.5:7b-instruct-q4_K_M
 CAIRN_LLM_TIMEOUT_S=90
 CAIRN_LLM_NUM_CTX_FINAL=12288
@@ -417,7 +417,7 @@ CAIRN_SUMMARY_ENABLED=true
 
 - Run a 5-min mock meeting in dev (`npm start` + cairn-svc on node4 + Ollama on node8 with real model).
 - Verify: 2 rolling entries appear in sidebar at ~2:00 and ~4:00; final summary appears on Stop; transcript/summary toggle swaps panes; saved session replays summaries from disk.
-- Verify GPU: `ssh nick@aorus-node8 nvidia-smi` shows Speaches + Ollama both resident, no OOM.
+- Verify GPU: `ssh user@media-host nvidia-smi` shows Speaches + Ollama both resident, no OOM.
 
 ---
 

@@ -20,7 +20,7 @@
 - [ ] **Step 1: Write the failing test**
 
 ```bash
-ssh node4 "cat > /home/nick/cairn-svc/tests/test_stitch_labels_no_mint.py" <<'EOF'
+ssh node4 "cat > ~/cairn-svc/tests/test_stitch_labels_no_mint.py" <<'EOF'
 """Verify stitch_labels never mints new canonical SIDs.
 
 Per the streaming-defers-to-auth-pass design (2026-05-09): when the
@@ -114,7 +114,7 @@ EOF
 - [ ] **Step 2: Run to verify failure**
 
 ```bash
-ssh node4 'cd /home/nick/cairn-svc && pytest tests/test_stitch_labels_no_mint.py -v 2>&1 | tail -20'
+ssh node4 'cd ~/cairn-svc && pytest tests/test_stitch_labels_no_mint.py -v 2>&1 | tail -20'
 ```
 
 Expected: tests 1 and 2 FAIL because Tier 0 still mints. Test 3 should PASS (sanity check; pre-existing behavior).
@@ -178,7 +178,7 @@ Update the docstring to reflect the new tier 0 behavior:
 - [ ] **Step 2: Run tests, expect 1+2 to pass and 3 still passes**
 
 ```bash
-ssh node4 'cd /home/nick/cairn-svc && pytest tests/test_stitch_labels_no_mint.py -v 2>&1 | tail -20'
+ssh node4 'cd ~/cairn-svc && pytest tests/test_stitch_labels_no_mint.py -v 2>&1 | tail -20'
 ```
 
 All 3 tests pass.
@@ -186,7 +186,7 @@ All 3 tests pass.
 - [ ] **Step 3: Run the full svc test suite to check for regressions**
 
 ```bash
-ssh node4 'cd /home/nick/cairn-svc && pytest -x -q 2>&1 | tail -30'
+ssh node4 'cd ~/cairn-svc && pytest -x -q 2>&1 | tail -30'
 ```
 
 Expected: all pass. If any test fails because it depended on the old mint behavior, investigate. Don't paper-over by editing the test — flag and report.
@@ -237,7 +237,7 @@ Wrap with a guard:
 - [ ] **Step 3: Run full svc test suite**
 
 ```bash
-ssh node4 'cd /home/nick/cairn-svc && pytest -x -q 2>&1 | tail -10'
+ssh node4 'cd ~/cairn-svc && pytest -x -q 2>&1 | tail -10'
 ```
 
 Expected: all pass.
@@ -247,7 +247,7 @@ Expected: all pass.
 - [ ] **Step 1: Single commit covering Tasks 1-3**
 
 ```bash
-ssh node4 'cd /home/nick/cairn-svc && git add cairn_svc/server.py tests/test_stitch_labels_no_mint.py && git commit -m "feat(svc): streaming defers to auth pass for new SID minting (S? placeholder)"'
+ssh node4 'cd ~/cairn-svc && git add cairn_svc/server.py tests/test_stitch_labels_no_mint.py && git commit -m "feat(svc): streaming defers to auth pass for new SID minting (S? placeholder)"'
 ```
 
 - [ ] **Step 2: Restart cairn-svc**
@@ -263,7 +263,7 @@ Verify status is `active (running)`.
 - [ ] **Step 3: Confirm svc is reachable**
 
 ```bash
-curl -fsS --max-time 3 http://100.99.99.72:8300/health 2>&1 || echo "(no /health endpoint — that's OK, the WS is the real check)"
+curl -fsS --max-time 3 http://<tailnet-ip>:8300/health 2>&1 || echo "(no /health endpoint — that's OK, the WS is the real check)"
 ```
 
 The 20-min e2e harness in Task 5 is the real smoke test.
@@ -273,7 +273,7 @@ The 20-min e2e harness in Task 5 is the real smoke test.
 - [ ] **Step 1: Run the harness against the 3-speaker fixture**
 
 ```bash
-cd /Users/nickcason/dev/cairn && \
+cd ~/dev/cairn && \
 REFERENCE=scripts/fixtures/diamandis-220-reference.json bash scripts/cairn-loop.sh \
   --url 'https://www.youtube.com/watch?v=RSNuB9pj9P8&t=296s' \
   --duration 1200 \

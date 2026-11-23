@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-08
 **Status:** Approved (brainstorming → writing-plans)
-**Repos affected:** `cairn-svc` (~/cairn-svc on precision-node4), `cairn` client (this repo)
+**Repos affected:** `cairn-svc` (~/cairn-svc on server-host), `cairn` client (this repo)
 
 ## Goal
 

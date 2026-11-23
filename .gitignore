@@ -11,3 +11,6 @@ dist-app/
 .superpowers/
 .claude/
 __pycache__/
+
+# reference transcripts are third-party text: built locally by scripts/build-reference*.py, never committed
+scripts/fixtures/*.json

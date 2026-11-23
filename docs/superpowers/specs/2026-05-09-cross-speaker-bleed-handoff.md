@@ -14,8 +14,8 @@ The user has explicitly scoped this work to **cross-speaker bleeding only**. Wit
 
 ## Architecture you need to know
 
-- `cairn-svc` lives on `node4` (`ssh node4`, source at `~/cairn-svc/`). Tests via `~/cairn-svc/.venv/bin/python -m pytest`. The service is run by user-scope systemd (`systemctl --user restart cairn-svc`). Endpoint: `ws://100.99.99.72:8300`.
-- The Electron client is at `/Users/nickcason/dev/cairn/`. `npm run install-app` rebuilds and refreshes `/Applications/Cairn.app` symlink to the dev bundle. Server-only changes do NOT need a client rebuild.
+- `cairn-svc` lives on `node4` (`ssh node4`, source at `~/cairn-svc/`). Tests via `~/cairn-svc/.venv/bin/python -m pytest`. The service is run by user-scope systemd (`systemctl --user restart cairn-svc`). Endpoint: `ws://<tailnet-ip>:8300`.
+- The Electron client is at `~/dev/cairn/`. `npm run install-app` rebuilds and refreshes `/Applications/Cairn.app` symlink to the dev bundle. Server-only changes do NOT need a client rebuild.
 - The pipeline:
   1. Audio buffer accumulates from the WebSocket.
   2. `vad.py::find_commit_boundary_s` looks for tail silence (≥500 ms) or forces a commit at `max_chunk_s` (12 s).
@@ -124,7 +124,7 @@ Other directions worth considering:
 - Plan for the failed attempt: `docs/superpowers/plans/2026-05-09-word-level-speaker-split.md`
 - This handoff: `docs/superpowers/specs/2026-05-09-cross-speaker-bleed-handoff.md`
 - Current source on node4: `ssh node4`, `~/cairn-svc/cairn_svc/{server,transcribe,diarize,vad,session}.py`
-- Saved test transcripts on the local Mac: `/Users/nickcason/Documents/Cairn/2026-05-09-live/`
+- Saved test transcripts on the local Mac: `~/Documents/Cairn/2026-05-09-live/`
   - `transcript.jsonl.bak` — earlier 7-min run with the bleed visible (seq 64 case)
   - `transcript.jsonl` — most recent 2-min run (after revert; baseline working state with bleed)
 

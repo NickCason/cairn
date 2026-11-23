@@ -159,7 +159,7 @@ Cumulative CPU over a 30-min session: passes at 30s, 60s, 120s, 240s, 480s, 960s
 | `tests/test_protocol.py` | EXTEND | SpeakerRelabelMsg roundtrip |
 | `.env.example` | MODIFY | Document `CAIRN_AUTH_DIAR_HIGH`, `CAIRN_AUTH_DIAR_FIRST_TICK_S`, `CAIRN_AUTH_DIAR_ENABLED` |
 
-### Cairn client (`/Users/nickcason/dev/cairn`)
+### Cairn client (`~/dev/cairn`)
 
 | File | Change | Responsibility |
 |---|---|---|

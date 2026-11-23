@@ -6,7 +6,7 @@
 
 **Architecture:** Two diarization pipelines run independently. Streaming (existing, unchanged) handles live attribution on a 30 s window every 30 s. Authoritative (new) handles full-audio re-diarization on a doubling cadence (30 s, 60 s, 120 s, …, plus on-stop). Each pipeline owns its own centroid state and lock. The single `stable_id` namespace and `Session._ledger` are the only shared state; reconciliation reads the ledger, mutates speaker_ids, and emits per-line corrections.
 
-**Tech Stack:** cairn-svc (Python 3.11, FastAPI/WebSocket, pyannote.audio 3.x, pytest) on `precision-node4` at `~/cairn-svc`. Cairn client (TypeScript, Electron renderer) at `/Users/nickcason/dev/cairn`. Reference spec: `docs/superpowers/specs/2026-05-08-progressive-diarization-design.md`.
+**Tech Stack:** cairn-svc (Python 3.11, FastAPI/WebSocket, pyannote.audio 3.x, pytest) on `server-host` at `~/cairn-svc`. Cairn client (TypeScript, Electron renderer) at `~/dev/cairn`. Reference spec: `docs/superpowers/specs/2026-05-08-progressive-diarization-design.md`.
 
 **Repository operations:** All cairn-svc tasks run via `ssh node4` (server is local-only, no remote — commit only, no push). Client tasks run locally; commit + push to `origin/main` at the end.
 
@@ -793,7 +793,7 @@ No commit (verification only).
 ## Task 10: Client — `ws.ts` add `SpeakerRelabel`
 
 **Files:**
-- Modify: `/Users/nickcason/dev/cairn/src/renderer/ws.ts`
+- Modify: `~/dev/cairn/src/renderer/ws.ts`
 
 - [ ] **Step 1: Add the type to the union**
 
@@ -812,14 +812,14 @@ export type ServerMsg = TranscriptPartial | TranscriptFinal | SpeakerAssigned | 
 - [ ] **Step 2: Type-check**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -5
+cd ~/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -5
 ```
 Expected: zero errors.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add src/renderer/ws.ts && git commit -m "feat(client): SpeakerRelabel type in ServerMsg union"
+cd ~/dev/cairn && git add src/renderer/ws.ts && git commit -m "feat(client): SpeakerRelabel type in ServerMsg union"
 ```
 
 ---
@@ -827,7 +827,7 @@ cd /Users/nickcason/dev/cairn && git add src/renderer/ws.ts && git commit -m "fe
 ## Task 11: Client — `transcript.ts.relabelLine`
 
 **Files:**
-- Modify: `/Users/nickcason/dev/cairn/src/renderer/transcript.ts`
+- Modify: `~/dev/cairn/src/renderer/transcript.ts`
 
 - [ ] **Step 1: Add the method**
 
@@ -861,14 +861,14 @@ Inside the `TranscriptView` class, after `mergeSpeakers` (around the same area a
 - [ ] **Step 2: Type-check**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -5
+cd ~/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -5
 ```
 Expected: zero errors.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add src/renderer/transcript.ts && git commit -m "feat(client): TranscriptView.relabelLine"
+cd ~/dev/cairn && git add src/renderer/transcript.ts && git commit -m "feat(client): TranscriptView.relabelLine"
 ```
 
 ---
@@ -876,7 +876,7 @@ cd /Users/nickcason/dev/cairn && git add src/renderer/transcript.ts && git commi
 ## Task 12: Client — handle `speaker_relabel` in `app.ts`
 
 **Files:**
-- Modify: `/Users/nickcason/dev/cairn/src/renderer/app.ts`
+- Modify: `~/dev/cairn/src/renderer/app.ts`
 
 - [ ] **Step 1: Add the branch in `onMsg`**
 
@@ -893,14 +893,14 @@ In the `onMsg` function, immediately after the existing `speaker_merge` branch a
 - [ ] **Step 2: Type-check + build**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -5 && npm run build 2>&1 | tail -3
+cd ~/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -5 && npm run build 2>&1 | tail -3
 ```
 Expected: zero errors. Build succeeds.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add src/renderer/app.ts && git commit -m "feat(client): handle speaker_relabel — single-row retroactive relabel"
+cd ~/dev/cairn && git add src/renderer/app.ts && git commit -m "feat(client): handle speaker_relabel — single-row retroactive relabel"
 ```
 
 ---
@@ -912,7 +912,7 @@ cd /Users/nickcason/dev/cairn && git add src/renderer/app.ts && git commit -m "f
 - [ ] **Step 1: Re-package the desktop app so the symlinked `/Applications/Cairn.app` picks up the new code**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npm run package 2>&1 | tail -5
+cd ~/dev/cairn && npm run package 2>&1 | tail -5
 ```
 
 - [ ] **Step 2: Manual smoke**
@@ -932,13 +932,13 @@ Expected: `speaker_relabel` events present; finals concentrated on 2 stable_ids.
 - [ ] **Step 4: Push client commits**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git push origin main
+cd ~/dev/cairn && git push origin main
 ```
 
 - [ ] **Step 5: Final status check**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git status && git log --oneline -10
+cd ~/dev/cairn && git status && git log --oneline -10
 ssh node4 'cd ~/cairn-svc && git log --oneline -10'
 ```
 

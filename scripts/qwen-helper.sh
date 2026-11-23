@@ -15,7 +15,7 @@ PROMPT=$(cat)
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 TMP=$(mktemp)
 START_NS=$(date +%s%N)
-curl -sS http://100.122.121.18:11434/api/chat \
+curl -sS "${OLLAMA_URL:-http://127.0.0.1:11434}/api/chat" \
   -H "Content-Type: application/json" \
   -d "$(jq -n --arg p "$PROMPT" --arg m "$MODEL" '{
     model: $m,

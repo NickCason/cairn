@@ -4,14 +4,14 @@
 
 ## What ships
 - Mac Electron app at `~/dev/cairn/` (`npm start` for live, `npm run test:benchmark` for benchmark)
-- n4 `cairn-svc` running as user-systemd, reachable at `ws://100.99.99.72:8300/ws/transcribe`
+- n4 `cairn-svc` running as user-systemd, reachable at `ws://<tailnet-ip>:8300/ws/transcribe`
 - 4-speaker Kokoro benchmark at `benchmarks/four-speaker-vendor-sync.wav`
 
 ## End-to-end benchmark
 
 ```
 === BENCHMARK RESULTS ===
-output dir:          /Users/nickcason/Documents/Cairn/2026-05-08-benchmark-four-speaker
+output dir:          ~/Documents/Cairn/2026-05-08-benchmark-four-speaker
 final transcripts:   48
 speakers seen:       S1, S2, S3, S4  (target: ≥3)
 part numbers found:  1/3  1756-L83E
@@ -70,7 +70,7 @@ Qwen 3.6 35B-A3B via Ollama on the P4000 node offered mixed utility for the Cair
 **Read:** the regression is entirely concentrated in the known "rows stuck on S? after stop" pathology — no new misattribution. From the grader's `bleeds` array, every bleed has `cairn_speaker: "S?"`, meaning the speaker never got assigned, not that it was assigned wrong. Single-run variance is high; two-three additional runs would clarify whether the elevated S?-stuck rate is a real regression or run noise.
 
 **Cutover-specific observations from this run:**
-- Webapp HTTPS endpoint at `https://precision-node4.taild99f50.ts.net/` serves the renderer correctly under Safari.
+- Webapp HTTPS endpoint at `https://<host>.<tailnet>.ts.net/` serves the renderer correctly under Safari.
 - Initial bug: autostart IIFE raced the module-scope mic warm-up — `getUserMedia` opened built-in mic instead of saved BlackHole device. Fixed at SHA after T17 by making autostart `await warmupReady`.
 - Initial bug: device persistence in Safari was clobbered by `refreshDeviceList` re-saving on every call before the warm-up had populated labels. Fixed by persisting only on explicit `onchange`.
 - Harness wart: final_summary poll regex `'"type":"final_summary"'` doesn't match server's actual emission `'"type": "final_summary"'` (space after colon). Polling timed out at 300s but the line was in the file the whole time. Follow-up: make the harness pattern lenient.

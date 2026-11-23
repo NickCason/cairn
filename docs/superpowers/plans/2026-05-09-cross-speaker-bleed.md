@@ -37,7 +37,7 @@
 ## Path conventions used in this plan
 
 - **Service work** is done on `node4` via `ssh node4` and lives at `~/cairn-svc/`. Tests run via `~/cairn-svc/.venv/bin/python -m pytest`.
-- **Client work** is done locally in `/Users/nickcason/dev/cairn/`. Build via `npm run build`. The dev bundle is symlinked into `/Applications/Cairn.app` via `npm run install-app`.
+- **Client work** is done locally in `~/dev/cairn/`. Build via `npm run build`. The dev bundle is symlinked into `/Applications/Cairn.app` via `npm run install-app`.
 - **Restart policy:** the user is stepping away for this run, so restart `cairn-svc` exactly once at deploy time (Task 11). If a service-restart happens earlier (e.g., to verify a code path), call it out in the commit message and confirm the next iteration is uninterrupted.
 
 ---
@@ -1230,8 +1230,8 @@ ssh node4 'cd ~/cairn-svc && git add cairn_svc/server.py tests/test_split_eligib
 - [ ] **Step 1: Locate the protocol type file and dispatch site**
 
 ```
-grep -RIn "transcript_final" /Users/nickcason/dev/cairn/src/renderer/ | head -20
-grep -RIn "speaker_relabel" /Users/nickcason/dev/cairn/src/renderer/ | head -10
+grep -RIn "transcript_final" ~/dev/cairn/src/renderer/ | head -20
+grep -RIn "speaker_relabel" ~/dev/cairn/src/renderer/ | head -10
 ```
 
 `speaker_relabel` is the closest analog to what we're adding — find where it's parsed and where `view.relabelLine(...)` is called. That's the dispatch site.
@@ -1309,14 +1309,14 @@ Place it next to the existing `speaker_relabel` case for consistency.
 - [ ] **Step 5: Build the renderer to verify TypeScript compiles**
 
 ```
-cd /Users/nickcason/dev/cairn && npm run build 2>&1 | tail -20
+cd ~/dev/cairn && npm run build 2>&1 | tail -20
 ```
 Expected: build succeeds with no TS errors.
 
 - [ ] **Step 6: Commit**
 
 ```
-cd /Users/nickcason/dev/cairn && git add src/renderer/ && git commit -m "feat(client): handle transcript_split — replace row in place + insert split rows"
+cd ~/dev/cairn && git add src/renderer/ && git commit -m "feat(client): handle transcript_split — replace row in place + insert split rows"
 ```
 
 ---
@@ -1331,8 +1331,8 @@ cd /Users/nickcason/dev/cairn && git add src/renderer/ && git commit -m "feat(cl
 - [ ] **Step 1: Read existing main + preload + renderer wiring**
 
 ```
-grep -n "ipcMain\|ipcRenderer\|contextBridge" /Users/nickcason/dev/cairn/src/main.ts /Users/nickcason/dev/cairn/src/preload.ts 2>&1 | head -30
-grep -RIn "Start" /Users/nickcason/dev/cairn/src/renderer/index.ts | head -10
+grep -n "ipcMain\|ipcRenderer\|contextBridge" ~/dev/cairn/src/main.ts ~/dev/cairn/src/preload.ts 2>&1 | head -30
+grep -RIn "Start" ~/dev/cairn/src/renderer/index.ts | head -10
 ```
 
 Confirm where the existing Start/Stop button handlers live and what they call. Note the imports for `BrowserWindow` and the main window reference; note whether there's an existing IPC scheme.
@@ -1435,7 +1435,7 @@ ipcMain.on("cairn:report-transcript", (_event, payload) => {
 
 Find the existing `contextBridge.exposeInMainWorld(...)` call:
 ```
-grep -n "contextBridge" /Users/nickcason/dev/cairn/src/preload.ts
+grep -n "contextBridge" ~/dev/cairn/src/preload.ts
 ```
 
 Append to the exposed object:
@@ -1487,7 +1487,7 @@ Find where the renderer maintains its in-memory transcript array (the rows shown
 - [ ] **Step 5: Build the client and start it once for a smoke check**
 
 ```
-cd /Users/nickcason/dev/cairn && npm run build 2>&1 | tail -10
+cd ~/dev/cairn && npm run build 2>&1 | tail -10
 ```
 Expected: build succeeds.
 
@@ -1504,7 +1504,7 @@ Quit Cairn before continuing.
 - [ ] **Step 6: Commit**
 
 ```
-cd /Users/nickcason/dev/cairn && git add src/main.ts src/preload.ts src/renderer/ && git commit -m "feat(client): localhost HTTP control endpoint for scripted start/stop + live transcript"
+cd ~/dev/cairn && git add src/main.ts src/preload.ts src/renderer/ && git commit -m "feat(client): localhost HTTP control endpoint for scripted start/stop + live transcript"
 ```
 
 ---
@@ -1649,20 +1649,20 @@ log "run output: $OUT"
 Make it executable:
 
 ```
-chmod +x /Users/nickcason/dev/cairn/scripts/cairn-loop.sh
+chmod +x ~/dev/cairn/scripts/cairn-loop.sh
 ```
 
 - [ ] **Step 2: Smoke-test the script's argument parsing only (no full run)**
 
 ```
-/Users/nickcason/dev/cairn/scripts/cairn-loop.sh --help
+~/dev/cairn/scripts/cairn-loop.sh --help
 ```
 Expected: usage text printed.
 
 - [ ] **Step 3: Commit**
 
 ```
-cd /Users/nickcason/dev/cairn && git add scripts/cairn-loop.sh && git commit -m "feat(scripts): cairn-loop.sh e2e harness for repeatable Safari + Cairn runs"
+cd ~/dev/cairn && git add scripts/cairn-loop.sh && git commit -m "feat(scripts): cairn-loop.sh e2e harness for repeatable Safari + Cairn runs"
 ```
 
 ---
@@ -1790,9 +1790,9 @@ if __name__ == "__main__":
 - [ ] **Step 2: Build the fixture once**
 
 ```
-mkdir -p /Users/nickcason/dev/cairn/scripts/fixtures
-python3 /Users/nickcason/dev/cairn/scripts/build-reference.py \
-  --out /Users/nickcason/dev/cairn/scripts/fixtures/dario-reference.json
+mkdir -p ~/dev/cairn/scripts/fixtures
+python3 ~/dev/cairn/scripts/build-reference.py \
+  --out ~/dev/cairn/scripts/fixtures/dario-reference.json
 ```
 
 If the parser returns fewer than 5 entries, the page structure differs from what `parse_entries` expects. Fall back to a manual approach:
@@ -1942,7 +1942,7 @@ if __name__ == "__main__":
 
 Make executable:
 ```
-chmod +x /Users/nickcason/dev/cairn/scripts/grade-transcript.py
+chmod +x ~/dev/cairn/scripts/grade-transcript.py
 ```
 
 - [ ] **Step 4: Test the grader with synthetic inputs**
@@ -2033,14 +2033,14 @@ def test_anchor_sec_offset_applied():
 
 Run:
 ```
-cd /Users/nickcason/dev/cairn && python3 -m pytest scripts/test_grade_transcript.py -v 2>&1 | tail -10
+cd ~/dev/cairn && python3 -m pytest scripts/test_grade_transcript.py -v 2>&1 | tail -10
 ```
 Expected: 4 passed.
 
 - [ ] **Step 5: Commit**
 
 ```
-cd /Users/nickcason/dev/cairn && git add scripts/build-reference.py scripts/grade-transcript.py scripts/test_grade_transcript.py scripts/fixtures/dario-reference.json && git commit -m "feat(scripts): bleed-rate grader + Lex/Dario reference fixture"
+cd ~/dev/cairn && git add scripts/build-reference.py scripts/grade-transcript.py scripts/test_grade_transcript.py scripts/fixtures/dario-reference.json && git commit -m "feat(scripts): bleed-rate grader + Lex/Dario reference fixture"
 ```
 
 ---
@@ -2073,7 +2073,7 @@ Expected: clean startup ("Application startup complete"), no traceback.
 - [ ] **Step 3: Build + install client**
 
 ```
-cd /Users/nickcason/dev/cairn && npm run build 2>&1 | tail -5 && npm run install-app
+cd ~/dev/cairn && npm run build 2>&1 | tail -5 && npm run install-app
 ```
 Expected: build OK; `/Applications/Cairn.app` symlink refreshed.
 
@@ -2093,7 +2093,7 @@ Expected: `state=idle`. The first sleep gives Cairn a chance to clean-quit; the 
 - [ ] **Step 5: Run the 10-minute loop**
 
 ```
-/Users/nickcason/dev/cairn/scripts/cairn-loop.sh \
+~/dev/cairn/scripts/cairn-loop.sh \
   --url 'https://www.youtube.com/watch?v=ugvHCXCOmm4&t=194s' \
   --duration 600 \
   --out /tmp/cairn-test-runs

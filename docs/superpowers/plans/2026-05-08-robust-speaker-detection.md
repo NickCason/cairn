@@ -6,7 +6,7 @@
 
 **Architecture:** Each `Session.stable_id` carries a duration-weighted EMA voice centroid persisted for the whole session. `stitch_labels` picks a stable_id per pyannote-local label using a hierarchy: strong embedding match (cosine ≥ HIGH) → geometric overlap ≥ 0.20 → tentative low-band embedding match (short utterance) → mint new. After every diar pass, `merge_sweep` pairwise-compares centroids and collapses ids whose cosine ≥ MERGE_COS via `Session.merge_stable`, emitting `speaker_merge` WS events that the client uses to retroactively rewrite past lines in place.
 
-**Tech Stack:** cairn-svc (Python 3.11, FastAPI/WebSocket, pyannote.audio 3.x, NumPy, pytest) on `precision-node4` at `~/cairn-svc`. Cairn client (TypeScript, Electron renderer, vanilla DOM) at `/Users/nickcason/dev/cairn`. Reference spec: `docs/superpowers/specs/2026-05-08-robust-speaker-detection-design.md`.
+**Tech Stack:** cairn-svc (Python 3.11, FastAPI/WebSocket, pyannote.audio 3.x, NumPy, pytest) on `server-host` at `~/cairn-svc`. Cairn client (TypeScript, Electron renderer, vanilla DOM) at `~/dev/cairn`. Reference spec: `docs/superpowers/specs/2026-05-08-robust-speaker-detection-design.md`.
 
 **Repository operations:** All cairn-svc tasks run via `ssh node4` (server is local-only, no remote — commit only, no push). Client tasks run locally; commit + push to `origin/main`.
 
@@ -1330,7 +1330,7 @@ No commit (verification only).
 ## Task 14: Client — `ws.ts` add `SpeakerMergeMsg`, drop `setNumSpeakers`
 
 **Files:**
-- Modify: `/Users/nickcason/dev/cairn/src/renderer/ws.ts`
+- Modify: `~/dev/cairn/src/renderer/ws.ts`
 
 - [ ] **Step 1: Edit `ws.ts`**
 
@@ -1381,7 +1381,7 @@ export class CairnWS {
 - [ ] **Step 2: Type-check**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -10
+cd ~/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -10
 ```
 
 Expected: errors at every call site of `setNumSpeakers` and at the `ws.start(meetingName, currentSpeakers)` call. These are fixed in Task 18; ignore for now.
@@ -1389,7 +1389,7 @@ Expected: errors at every call site of `setNumSpeakers` and at the `ws.start(mee
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add src/renderer/ws.ts && git commit -m "feat(client): SpeakerMerge type; drop setNumSpeakers from CairnWS"
+cd ~/dev/cairn && git add src/renderer/ws.ts && git commit -m "feat(client): SpeakerMerge type; drop setNumSpeakers from CairnWS"
 ```
 
 ---
@@ -1397,7 +1397,7 @@ cd /Users/nickcason/dev/cairn && git add src/renderer/ws.ts && git commit -m "fe
 ## Task 15: Client — `speakers.ts.merge`
 
 **Files:**
-- Modify: `/Users/nickcason/dev/cairn/src/renderer/speakers.ts` (after `recolor`)
+- Modify: `~/dev/cairn/src/renderer/speakers.ts` (after `recolor`)
 
 - [ ] **Step 1: Add the `merge` method**
 
@@ -1425,7 +1425,7 @@ In `speakers.ts`, inside the `SpeakersPanel` class, after the `recolor` method, 
 - [ ] **Step 2: Type-check**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -10
+cd ~/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -10
 ```
 
 Expected: no new errors specific to speakers.ts (call-site errors from Task 14 still pending).
@@ -1433,7 +1433,7 @@ Expected: no new errors specific to speakers.ts (call-site errors from Task 14 s
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add src/renderer/speakers.ts && git commit -m "feat(client): SpeakersPanel.merge(src, dst)"
+cd ~/dev/cairn && git add src/renderer/speakers.ts && git commit -m "feat(client): SpeakersPanel.merge(src, dst)"
 ```
 
 ---
@@ -1441,7 +1441,7 @@ cd /Users/nickcason/dev/cairn && git add src/renderer/speakers.ts && git commit 
 ## Task 16: Client — `transcript.ts.mergeSpeakers`
 
 **Files:**
-- Modify: `/Users/nickcason/dev/cairn/src/renderer/transcript.ts` (next to `applySpeaker`)
+- Modify: `~/dev/cairn/src/renderer/transcript.ts` (next to `applySpeaker`)
 
 - [ ] **Step 1: Add `mergeSpeakers`**
 
@@ -1476,7 +1476,7 @@ The `lastFinalSpeaker` rewrite preserves the same-speaker mid-sentence merging b
 - [ ] **Step 2: Type-check**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -10
+cd ~/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -10
 ```
 
 Expected: no new errors specific to transcript.ts.
@@ -1484,7 +1484,7 @@ Expected: no new errors specific to transcript.ts.
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add src/renderer/transcript.ts && git commit -m "feat(client): TranscriptView.mergeSpeakers DOM rewrite"
+cd ~/dev/cairn && git add src/renderer/transcript.ts && git commit -m "feat(client): TranscriptView.mergeSpeakers DOM rewrite"
 ```
 
 ---
@@ -1492,7 +1492,7 @@ cd /Users/nickcason/dev/cairn && git add src/renderer/transcript.ts && git commi
 ## Task 17: Client — handle `speaker_merge` in `app.ts`
 
 **Files:**
-- Modify: `/Users/nickcason/dev/cairn/src/renderer/app.ts:146-175` (`onMsg`)
+- Modify: `~/dev/cairn/src/renderer/app.ts:146-175` (`onMsg`)
 
 - [ ] **Step 1: Add the handler branch**
 
@@ -1510,7 +1510,7 @@ In `onMsg`, after the `final_summary` branch, before `ack`:
 - [ ] **Step 2: Type-check**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -10
+cd ~/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -10
 ```
 
 Expected: still errors from Task 14 around the dropdown plumbing. The `speaker_merge` branch should type-check cleanly.
@@ -1518,7 +1518,7 @@ Expected: still errors from Task 14 around the dropdown plumbing. The `speaker_m
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add src/renderer/app.ts && git commit -m "feat(client): handle speaker_merge — relabel transcript + speakers panel"
+cd ~/dev/cairn && git add src/renderer/app.ts && git commit -m "feat(client): handle speaker_merge — relabel transcript + speakers panel"
 ```
 
 ---
@@ -1526,8 +1526,8 @@ cd /Users/nickcason/dev/cairn && git add src/renderer/app.ts && git commit -m "f
 ## Task 18: Client — drop dropdown plumbing
 
 **Files:**
-- Modify: `/Users/nickcason/dev/cairn/src/renderer/app.ts` (multiple sections)
-- Modify: `/Users/nickcason/dev/cairn/src/renderer/index.html:16` (the `#speakers-toggle` button)
+- Modify: `~/dev/cairn/src/renderer/app.ts` (multiple sections)
+- Modify: `~/dev/cairn/src/renderer/index.html:16` (the `#speakers-toggle` button)
 
 - [ ] **Step 1: Remove from `index.html`**
 
@@ -1555,7 +1555,7 @@ The fixture/screenshot path that previously set `currentSpeakers = numSpeakers` 
 - [ ] **Step 3: Type-check, build**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -10 && npm run build 2>&1 | tail -5
+cd ~/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -10 && npm run build 2>&1 | tail -5
 ```
 
 Expected: zero errors. Build succeeds.
@@ -1563,7 +1563,7 @@ Expected: zero errors. Build succeeds.
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add src/renderer/app.ts src/renderer/index.html && git commit -m "feat(client): remove speaker-count dropdown (full auto-detect)"
+cd ~/dev/cairn && git add src/renderer/app.ts src/renderer/index.html && git commit -m "feat(client): remove speaker-count dropdown (full auto-detect)"
 ```
 
 ---
@@ -1575,7 +1575,7 @@ cd /Users/nickcason/dev/cairn && git add src/renderer/app.ts src/renderer/index.
 - [ ] **Step 1: Full build**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npm run build 2>&1 | tail -5
+cd ~/dev/cairn && npm run build 2>&1 | tail -5
 ```
 
 Expected: clean build.
@@ -1583,7 +1583,7 @@ Expected: clean build.
 - [ ] **Step 2: Live smoke — start the app, run a 3-minute conversation with deliberate silence gaps**
 
 ```bash
-cd /Users/nickcason/dev/cairn && open dist-app/Cairn.app 2>/dev/null || npm run start &
+cd ~/dev/cairn && open dist-app/Cairn.app 2>/dev/null || npm run start &
 ```
 
 Manual verification:
@@ -1597,13 +1597,13 @@ Manual verification:
 - [ ] **Step 3: Push client commits**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git push origin main
+cd ~/dev/cairn && git push origin main
 ```
 
 - [ ] **Step 4: Final status check**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git status && git log --oneline -10
+cd ~/dev/cairn && git status && git log --oneline -10
 ssh node4 'cd ~/cairn-svc && git log --oneline -10'
 ```
 

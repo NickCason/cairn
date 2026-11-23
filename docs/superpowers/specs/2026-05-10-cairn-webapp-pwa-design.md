@@ -38,7 +38,7 @@
                     │  /control/transcript GET  │  cairn-loop transcript snapshot
                     │                           │
                     │  Disk:                    │
-                    │  /home/nick/cairn-svc/    │
+                    │  ~/cairn-svc/    │
                     │   webapp/         (UI)    │
                     │   sessions/<slug>/        │
                     │     transcript.jsonl      │
@@ -46,9 +46,9 @@
                     └───────────────────────────┘
 ```
 
-`tailscale serve --bg --https=443 / http://localhost:8300` on node4 puts HTTPS in front of cairn-svc with an auto-renewed cert at `https://precision-node4.taild99f50.ts.net`. Tailnet membership is the auth boundary — no app-level auth.
+`tailscale serve --bg --https=443 / http://localhost:8300` on node4 puts HTTPS in front of cairn-svc with an auto-renewed cert at `https://<host>.<tailnet>.ts.net`. Tailnet membership is the auth boundary — no app-level auth.
 
-## 3. What gets deleted (Mac repo `/Users/nickcason/dev/cairn`)
+## 3. What gets deleted (Mac repo `~/dev/cairn`)
 
 - `src/main.ts` (Electron host + 127.0.0.1:8765 control HTTP server)
 - `src/preload.ts` (IPC bridge)
@@ -70,7 +70,7 @@ The `screenshot-fixture.ts`, `test-runner.ts`, and `screenshot/demo` modes are d
 - Delete the `window.cairnControl.*` block. Replace with:
   - On load: if `?autostart=1` is present, auto-call `startLiveSession(meetingName)` after the WS opens.
   - On a new server-pushed `control_stop` message over `/ws/transcribe`, call `stopLiveSession()`.
-- Replace `const CAIRN_SVC_URL = "ws://100.99.99.72:8300/ws/transcribe"` with `const CAIRN_SVC_URL = \`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws/transcribe\``. Single bundle works from any origin.
+- Replace `const CAIRN_SVC_URL = "ws://<tailnet-ip>:8300/ws/transcribe"` with `const CAIRN_SVC_URL = \`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws/transcribe\``. Single bundle works from any origin.
 - Re-save-on-rename (commit `86454a6`): the `saveSession` call becomes `fetch(POST /sessions)` — same overwrite-by-slug semantics on the server side.
 
 ### 4.2 `src/renderer/index.html`
@@ -103,15 +103,15 @@ cp "$ROOT"/dist/renderer/*.js "$STAGE/assets/"
 cp "$ROOT"/src/renderer/{style.css,audio-worklet.js} "$STAGE/assets/"
 cp "$ROOT"/src/icons/* "$STAGE/assets/icons/"
 cp "$ROOT"/src/renderer/index.html "$STAGE/index.html"
-rsync -az --delete "$STAGE/" nick@100.99.99.72:/home/nick/cairn-svc/webapp/
-ssh nick@100.99.99.72 "systemctl --user restart cairn-svc"
+rsync -az --delete "$STAGE/" user@<tailnet-ip>:~/cairn-svc/webapp/
+ssh user@<tailnet-ip> "systemctl --user restart cairn-svc"
 rm -rf "$STAGE"
-echo "deployed → https://precision-node4.taild99f50.ts.net/"
+echo "deployed → https://<host>.<tailnet>.ts.net/"
 ```
 
 ### 4.6 `scripts/cairn-loop.sh`
 
-- Change all `curl` URLs from `http://127.0.0.1:8765/control/...` to `https://precision-node4.taild99f50.ts.net/control/...`.
+- Change all `curl` URLs from `http://127.0.0.1:8765/control/...` to `https://<host>.<tailnet>.ts.net/control/...`.
 - The Safari-open command targets the same host with `?meeting_name=...&autostart=1`.
 - Stop-wait + final_summary polling logic unchanged (the server-side endpoint shapes match what the client previously served via Electron IPC).
 
@@ -258,7 +258,7 @@ No other server.py logic changes. The 1514-line file gets ~30 lines of additions
 
 ### 6.1 Mac live session
 
-1. User opens `https://precision-node4.taild99f50.ts.net/` in Safari.
+1. User opens `https://<host>.<tailnet>.ts.net/` in Safari.
 2. Page loads, fetches `/assets/cairn.svg` for logo, populates device picker via `enumerateDevices()`.
 3. User clicks Start. Page opens WSS to `/ws/transcribe`, sends `{type:"start", meeting_name, source:"aggregate"}`, calls `getUserMedia` for the chosen device, streams Int16 PCM via the existing AudioWorklet.
 4. cairn-svc emits `transcript_partial`/`transcript_final`/`speaker_*`/`rolling_summary`/etc. — page renders identically to today.
@@ -267,7 +267,7 @@ No other server.py logic changes. The 1514-line file gets ~30 lines of additions
 ### 6.2 cairn-loop harness session
 
 1. Harness curls `POST /control/start { meeting_name: "loop-xyz" }` — server records the name, returns `{ url: "/?meeting_name=loop-xyz&autostart=1" }`.
-2. Harness opens `https://precision-node4.taild99f50.ts.net/?meeting_name=loop-xyz&autostart=1` in Safari.
+2. Harness opens `https://<host>.<tailnet>.ts.net/?meeting_name=loop-xyz&autostart=1` in Safari.
 3. Page reads URL params, autostarts the session (skipping the manual Start click).
 4. Harness opens the YouTube fixture URL with `?t=` for autoplay (unchanged from today). Mac's chosen input device picks up the audio (loopback or mic).
 5. After Y seconds, harness curls `POST /control/stop`. Server sets `stop_event`. WS handler sees the event next tick, sends `{type:"control_stop"}` to the page. Page calls `stopLiveSession()`, awaits `final_summary`, POSTs `/sessions`. The save handler flips `control_state.state` to `"stopped"` as its last step.

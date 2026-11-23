@@ -9,8 +9,8 @@
 **Tech Stack:** FastAPI 0.115+, uvicorn 0.32+, Pydantic 2.x, Python 3.11 (cairn-svc on node4) · TypeScript 5.6, browser DOM + WebSocket + AudioWorklet (Mac renderer) · pytest 8 + pytest-asyncio 0.24 (server tests) · `tailscale serve` for TLS termination.
 
 **Repos involved:**
-- Mac repo: `/Users/nickcason/dev/cairn` — push to `origin/main` (NickCason/cairn).
-- node4 repo: `~/cairn-svc/` on node4 (`100.99.99.72`) — local-only, no remote. Restart with `systemctl --user restart cairn-svc`.
+- Mac repo: `~/dev/cairn` — push to `origin/main` (NickCason/cairn).
+- node4 repo: `~/cairn-svc/` on node4 (`<tailnet-ip>`) — local-only, no remote. Restart with `systemctl --user restart cairn-svc`.
 
 **SteeLL-v1 (Qwen 7b coder) usage:** Tasks 1, 4, 6, 13 route boilerplate generation through `scripts/qwen-helper.sh` (model: `qwen2.5-coder:7b` on node8). All Qwen output is reviewed and edited before commit. Commits using its output get a `Co-Authored-By: SteeLL-v1 <noreply@local>` trailer.
 
@@ -41,7 +41,7 @@
 - `src/renderer/index.html` — absolute asset URLs, viewport meta
 - `src/renderer/audio.ts` — absolute worklet URL
 - `package.json` — drop electron + scripts + build block, add `deploy` script, simplify `build`
-- `scripts/cairn-loop.sh` — retarget URLs from `127.0.0.1:8765` → `precision-node4.taild99f50.ts.net`
+- `scripts/cairn-loop.sh` — retarget URLs from `127.0.0.1:8765` → `<host>.<tailnet>.ts.net`
 - `.gitignore` — already has `dist-app/` (verified during commit phase)
 
 **Deleted (Mac repo, after server-side is up):**
@@ -94,7 +94,7 @@ T19 tailscale serve setup      — TLS
 - [ ] **Step 1: SSH to node4 and read current protocol.py outbound section**
 
 ```bash
-ssh nick@100.99.99.72 "sed -n '60,176p' ~/cairn-svc/cairn_svc/protocol.py"
+ssh user@<tailnet-ip> "sed -n '60,176p' ~/cairn-svc/cairn_svc/protocol.py"
 ```
 
 Expected: outbound model block ending around `ErrorMsg`. Note the import style (`Literal[...]` discriminators, `BaseModel`).
@@ -125,7 +125,7 @@ class ControlStopMsg(BaseModel):
 - [ ] **Step 3: Apply the patch on node4**
 
 ```bash
-ssh nick@100.99.99.72 "cat >> /tmp/control_stop_patch.py << 'EOF'
+ssh user@<tailnet-ip> "cat >> /tmp/control_stop_patch.py << 'EOF'
 
 class ControlStopMsg(BaseModel):
     type: Literal[\"control_stop\"] = \"control_stop\"
@@ -136,7 +136,7 @@ EOF
 Then on node4, find the right insertion point (after `ErrorMsg`, before any module-trailing definitions) and insert. Verify syntactically:
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && .venv/bin/python -c 'from cairn_svc.protocol import ControlStopMsg; print(ControlStopMsg().model_dump())'"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && .venv/bin/python -c 'from cairn_svc.protocol import ControlStopMsg; print(ControlStopMsg().model_dump())'"
 ```
 
 Expected: `{'type': 'control_stop'}`.
@@ -144,7 +144,7 @@ Expected: `{'type': 'control_stop'}`.
 - [ ] **Step 4: Commit on node4 (local-only, cairn-svc has no remote)**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && git add cairn_svc/protocol.py && git commit -m 'feat(protocol): add ControlStopMsg outbound model
+ssh user@<tailnet-ip> "cd ~/cairn-svc && git add cairn_svc/protocol.py && git commit -m 'feat(protocol): add ControlStopMsg outbound model
 
 Co-Authored-By: SteeLL-v1 <noreply@local>'"
 ```
@@ -193,7 +193,7 @@ def test_state_is_module_singleton():
 - [ ] **Step 2: Run test (will fail — module doesn't exist)**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && .venv/bin/pytest tests/test_webapp_state.py -v 2>&1 | tail -10"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && .venv/bin/pytest tests/test_webapp_state.py -v 2>&1 | tail -10"
 ```
 
 Expected: `ModuleNotFoundError: No module named 'cairn_svc.webapp_state'`
@@ -233,7 +233,7 @@ latest_transcript_snapshot: list[dict] = []
 - [ ] **Step 4: Run test (passes)**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && .venv/bin/pytest tests/test_webapp_state.py -v 2>&1 | tail -10"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && .venv/bin/pytest tests/test_webapp_state.py -v 2>&1 | tail -10"
 ```
 
 Expected: 4 passed.
@@ -241,7 +241,7 @@ Expected: 4 passed.
 - [ ] **Step 5: Commit (on node4)**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && git add cairn_svc/webapp_state.py tests/test_webapp_state.py && git commit -m 'feat(webapp_state): shared control state + stop-pulse asyncio.Event
+ssh user@<tailnet-ip> "cd ~/cairn-svc && git add cairn_svc/webapp_state.py tests/test_webapp_state.py && git commit -m 'feat(webapp_state): shared control state + stop-pulse asyncio.Event
 
 Single source of truth for harness control state, the stop event that
 bridges POST /control/stop to the WS receive loop, and the latest
@@ -371,7 +371,7 @@ def test_save_session_flips_control_state_to_stopped(client, monkeypatch):
 - [ ] **Step 2: Run test (fails — sessions module missing)**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && .venv/bin/pytest tests/test_sessions.py -v 2>&1 | tail -10"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && .venv/bin/pytest tests/test_sessions.py -v 2>&1 | tail -10"
 ```
 
 Expected: `ModuleNotFoundError: No module named 'cairn_svc.sessions'`.
@@ -492,7 +492,7 @@ async def read_session(slug: str) -> dict:
 - [ ] **Step 4: Run test (passes)**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && .venv/bin/pytest tests/test_sessions.py -v 2>&1 | tail -20"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && .venv/bin/pytest tests/test_sessions.py -v 2>&1 | tail -20"
 ```
 
 Expected: 6 passed.
@@ -500,7 +500,7 @@ Expected: 6 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && git add cairn_svc/sessions.py tests/test_sessions.py && git commit -m 'feat(sessions): POST/GET routes for transcript+meta persistence
+ssh user@<tailnet-ip> "cd ~/cairn-svc && git add cairn_svc/sessions.py tests/test_sessions.py && git commit -m 'feat(sessions): POST/GET routes for transcript+meta persistence
 
 Replaces the Electron IPC saveSession handler with server-side storage at
 SESSIONS_ROOT/<YYYY-MM-DD>-<slug>/. Same-day same-name overwrites
@@ -578,7 +578,7 @@ def test_unknown_asset_404s(client):
 - [ ] **Step 2: Run test (fails)**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && .venv/bin/pytest tests/test_static_routes.py -v 2>&1 | tail -10"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && .venv/bin/pytest tests/test_static_routes.py -v 2>&1 | tail -10"
 ```
 
 Expected: `ModuleNotFoundError`.
@@ -649,7 +649,7 @@ If Qwen produced something close but not identical, edit to match the above (esp
 - [ ] **Step 4: Run test (passes)**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && .venv/bin/pytest tests/test_static_routes.py -v 2>&1 | tail -10"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && .venv/bin/pytest tests/test_static_routes.py -v 2>&1 | tail -10"
 ```
 
 Expected: 4 passed.
@@ -657,7 +657,7 @@ Expected: 4 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && git add cairn_svc/static_routes.py tests/test_static_routes.py && git commit -m 'feat(static_routes): mount UI bundle at / and /assets
+ssh user@<tailnet-ip> "cd ~/cairn-svc && git add cairn_svc/static_routes.py tests/test_static_routes.py && git commit -m 'feat(static_routes): mount UI bundle at / and /assets
 
 Co-Authored-By: SteeLL-v1 <noreply@local>'"
 ```
@@ -757,7 +757,7 @@ def test_get_transcript_returns_snapshot(client):
 - [ ] **Step 2: Run test (fails)**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && .venv/bin/pytest tests/test_control.py -v 2>&1 | tail -10"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && .venv/bin/pytest tests/test_control.py -v 2>&1 | tail -10"
 ```
 
 Expected: ModuleNotFoundError.
@@ -834,7 +834,7 @@ def _default_meeting_name() -> str:
 - [ ] **Step 4: Run test (passes)**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && .venv/bin/pytest tests/test_control.py -v 2>&1 | tail -15"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && .venv/bin/pytest tests/test_control.py -v 2>&1 | tail -15"
 ```
 
 Expected: 6 passed.
@@ -842,7 +842,7 @@ Expected: 6 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && git add cairn_svc/control.py tests/test_control.py && git commit -m 'feat(control): /control/{start,stop,status,transcript} for cairn-loop harness
+ssh user@<tailnet-ip> "cd ~/cairn-svc && git add cairn_svc/control.py tests/test_control.py && git commit -m 'feat(control): /control/{start,stop,status,transcript} for cairn-loop harness
 
 Replaces the Electron 127.0.0.1:8765 control HTTP server. POST /stop sets
 an asyncio.Event the WS handler polls each receive iteration, then pushes
@@ -862,7 +862,7 @@ GET /status and /transcript power the harness poll loop unchanged.'"
 - [ ] **Step 1: Read current .env.example**
 
 ```bash
-ssh nick@100.99.99.72 "cat ~/cairn-svc/.env.example"
+ssh user@<tailnet-ip> "cat ~/cairn-svc/.env.example"
 ```
 
 - [ ] **Step 2: Generate doc block via Qwen**
@@ -896,18 +896,18 @@ Review Qwen's output. Final block to append (edit if Qwen drifted):
 # <CAIRN_SESSIONS_ROOT>/<YYYY-MM-DD>-<slug>/ with transcript.jsonl +
 # meta.json. Same-day same-name writes overwrite (intentional — supports
 # post-stop rename re-save flow).
-# CAIRN_SESSIONS_ROOT=/home/nick/cairn-svc/sessions
+# CAIRN_SESSIONS_ROOT=~/cairn-svc/sessions
 
 # Directory the FastAPI app serves UI assets from. Must contain
 # index.html and an assets/ subdirectory populated by the Mac-side
 # scripts/deploy-ui.sh script.
-# CAIRN_WEBAPP_ROOT=/home/nick/cairn-svc/webapp
+# CAIRN_WEBAPP_ROOT=~/cairn-svc/webapp
 ```
 
 Apply:
 
 ```bash
-ssh nick@100.99.99.72 "cat >> ~/cairn-svc/.env.example << 'EOF'
+ssh user@<tailnet-ip> "cat >> ~/cairn-svc/.env.example << 'EOF'
 
 # === Webapp / sessions paths (added by webapp cutover) ===
 
@@ -915,12 +915,12 @@ ssh nick@100.99.99.72 "cat >> ~/cairn-svc/.env.example << 'EOF'
 # <CAIRN_SESSIONS_ROOT>/<YYYY-MM-DD>-<slug>/ with transcript.jsonl +
 # meta.json. Same-day same-name writes overwrite (intentional — supports
 # post-stop rename re-save flow).
-# CAIRN_SESSIONS_ROOT=/home/nick/cairn-svc/sessions
+# CAIRN_SESSIONS_ROOT=~/cairn-svc/sessions
 
 # Directory the FastAPI app serves UI assets from. Must contain
 # index.html and an assets/ subdirectory populated by the Mac-side
 # scripts/deploy-ui.sh script.
-# CAIRN_WEBAPP_ROOT=/home/nick/cairn-svc/webapp
+# CAIRN_WEBAPP_ROOT=~/cairn-svc/webapp
 EOF
 "
 ```
@@ -928,7 +928,7 @@ EOF
 - [ ] **Step 4: Commit**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && git add .env.example && git commit -m 'docs(env): document CAIRN_SESSIONS_ROOT + CAIRN_WEBAPP_ROOT
+ssh user@<tailnet-ip> "cd ~/cairn-svc && git add .env.example && git commit -m 'docs(env): document CAIRN_SESSIONS_ROOT + CAIRN_WEBAPP_ROOT
 
 Co-Authored-By: SteeLL-v1 <noreply@local>'"
 ```
@@ -963,10 +963,10 @@ from .static_routes import mount as _mount_static
 Apply via SSH (locate the line first, then sed-insert):
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && grep -n '^from .protocol' cairn_svc/server.py"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && grep -n '^from .protocol' cairn_svc/server.py"
 # Note the line number, e.g. 13. The protocol import block spans 13-18.
 # Insert the new imports after line 18.
-ssh nick@100.99.99.72 "cd ~/cairn-svc && python3 - <<'PY'
+ssh user@<tailnet-ip> "cd ~/cairn-svc && python3 - <<'PY'
 from pathlib import Path
 p = Path('cairn_svc/server.py')
 src = p.read_text().splitlines(keepends=True)
@@ -991,7 +991,7 @@ PY"
 Verify:
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && grep -n 'webapp_state\\|_sessions_router\\|_mount_static' cairn_svc/server.py | head -5"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && grep -n 'webapp_state\\|_sessions_router\\|_mount_static' cairn_svc/server.py | head -5"
 ```
 
 Expected: 4 lines, all near the top of the file.
@@ -999,7 +999,7 @@ Expected: 4 lines, all near the top of the file.
 - [ ] **Step 2: Wire routers + static mount after `app = FastAPI()`**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && grep -n '^app = FastAPI' cairn_svc/server.py"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && grep -n '^app = FastAPI' cairn_svc/server.py"
 ```
 
 Take the line number (call it `N`). Insert immediately after, on line `N+1`:
@@ -1013,7 +1013,7 @@ _mount_static(app)
 Apply (replace `N` with the actual line number):
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && python3 - <<'PY'
+ssh user@<tailnet-ip> "cd ~/cairn-svc && python3 - <<'PY'
 from pathlib import Path
 p = Path('cairn_svc/server.py')
 src = p.read_text().splitlines(keepends=True)
@@ -1046,7 +1046,7 @@ In the WS handler's `if isinstance(ctrl, StartMsg):` branch (around line 1412), 
 Apply:
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && python3 - <<'PY'
+ssh user@<tailnet-ip> "cd ~/cairn-svc && python3 - <<'PY'
 from pathlib import Path
 p = Path('cairn_svc/server.py')
 src = p.read_text().splitlines(keepends=True)
@@ -1085,8 +1085,8 @@ NOTE: variable names (`seq`, `text`, `stable`, `tight_t0`, `tight_t1`) match the
 Inspect both sites, then patch each manually. Use:
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && sed -n '865,895p' cairn_svc/server.py"
-ssh nick@100.99.99.72 "cd ~/cairn-svc && sed -n '1440,1470p' cairn_svc/server.py"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && sed -n '865,895p' cairn_svc/server.py"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && sed -n '1440,1470p' cairn_svc/server.py"
 ```
 
 For each, `await ws.send_text(TranscriptFinalMsg(...))` ends at the matching `).model_dump_json())`. Insert the snapshot-append immediately after that closing line, with matching indentation.
@@ -1104,7 +1104,7 @@ The receive loop opens `while True: msg = await ws.receive()` at line ~1401. The
 Insert immediately after `msg = await ws.receive()` (BEFORE the `if msg["type"] == "websocket.disconnect"` check). Apply:
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && python3 - <<'PY'
+ssh user@<tailnet-ip> "cd ~/cairn-svc && python3 - <<'PY'
 from pathlib import Path
 p = Path('cairn_svc/server.py')
 src = p.read_text().splitlines(keepends=True)
@@ -1126,7 +1126,7 @@ PY"
 - [ ] **Step 6: Verify the file still parses + import-checks**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && .venv/bin/python -c 'from cairn_svc.server import app; print(\"routes:\", [r.path for r in app.routes])'"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && .venv/bin/python -c 'from cairn_svc.server import app; print(\"routes:\", [r.path for r in app.routes])'"
 ```
 
 Expected output includes `/sessions`, `/sessions/{slug}`, `/control/start`, `/control/stop`, `/control/status`, `/control/transcript`, `/`, `/assets`, `/ws/transcribe`.
@@ -1136,7 +1136,7 @@ If it errors, fix the error before continuing. Common issues: indentation mismat
 - [ ] **Step 7: Run the full existing test suite to confirm no regression**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && .venv/bin/pytest -x 2>&1 | tail -25"
+ssh user@<tailnet-ip> "cd ~/cairn-svc && .venv/bin/pytest -x 2>&1 | tail -25"
 ```
 
 Expected: all tests pass (existing ones unchanged, plus the new `test_webapp_state.py`, `test_sessions.py`, `test_static_routes.py`, `test_control.py`).
@@ -1144,7 +1144,7 @@ Expected: all tests pass (existing ones unchanged, plus the new `test_webapp_sta
 - [ ] **Step 8: Commit**
 
 ```bash
-ssh nick@100.99.99.72 "cd ~/cairn-svc && git add cairn_svc/server.py && git commit -m 'feat(server): wire webapp routers + bridge stop_event into WS handler
+ssh user@<tailnet-ip> "cd ~/cairn-svc && git add cairn_svc/server.py && git commit -m 'feat(server): wire webapp routers + bridge stop_event into WS handler
 
 - Mount /assets, /, /sessions/*, /control/* alongside existing /ws/transcribe.
 - On StartMsg: flip control state to recording, reset session_dir/snapshot.
@@ -1167,19 +1167,19 @@ No changes to the diarization, transcription, or summarization hot paths.'"
 - [ ] **Step 1: Restart the service**
 
 ```bash
-ssh nick@100.99.99.72 "systemctl --user restart cairn-svc && sleep 2 && systemctl --user status cairn-svc | head -10"
+ssh user@<tailnet-ip> "systemctl --user restart cairn-svc && sleep 2 && systemctl --user status cairn-svc | head -10"
 ```
 
 Expected: `Active: active (running)`. Tail journal if not:
 
 ```bash
-ssh nick@100.99.99.72 "journalctl --user -u cairn-svc -n 30 --no-pager"
+ssh user@<tailnet-ip> "journalctl --user -u cairn-svc -n 30 --no-pager"
 ```
 
 - [ ] **Step 2: Smoke /control/status**
 
 ```bash
-curl -sS http://100.99.99.72:8300/control/status | python3 -m json.tool
+curl -sS http://<tailnet-ip>:8300/control/status | python3 -m json.tool
 ```
 
 Expected:
@@ -1191,7 +1191,7 @@ Expected:
 - [ ] **Step 3: Smoke /control/start**
 
 ```bash
-curl -sS -X POST http://100.99.99.72:8300/control/start \
+curl -sS -X POST http://<tailnet-ip>:8300/control/start \
   -H 'content-type: application/json' \
   -d '{"meeting_name":"smoke-test-1"}' | python3 -m json.tool
 ```
@@ -1205,13 +1205,13 @@ Expected:
 - [ ] **Step 4: Smoke /sessions save + read**
 
 ```bash
-curl -sS -X POST http://100.99.99.72:8300/sessions \
+curl -sS -X POST http://<tailnet-ip>:8300/sessions \
   -H 'content-type: application/json' \
   -d '{"meeting_name":"smoke","events":[{"type":"transcript_final","text":"hello"}]}' \
   | python3 -m json.tool
-SLUG=$(curl -sS http://100.99.99.72:8300/sessions | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["slug"])')
+SLUG=$(curl -sS http://<tailnet-ip>:8300/sessions | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["slug"])')
 echo "slug=$SLUG"
-curl -sS "http://100.99.99.72:8300/sessions/$SLUG" | python3 -m json.tool | head -20
+curl -sS "http://<tailnet-ip>:8300/sessions/$SLUG" | python3 -m json.tool | head -20
 ```
 
 Expected: save returns `{"session_dir": "...", "slug": "<date>-smoke"}`; list shows the session; read returns `{"meta": {...}, "events": [{"type":"transcript_final","text":"hello"}]}`.
@@ -1219,13 +1219,13 @@ Expected: save returns `{"session_dir": "...", "slug": "<date>-smoke"}`; list sh
 Also verify on disk:
 
 ```bash
-ssh nick@100.99.99.72 "ls ~/cairn-svc/sessions/ && cat ~/cairn-svc/sessions/*-smoke/transcript.jsonl"
+ssh user@<tailnet-ip> "ls ~/cairn-svc/sessions/ && cat ~/cairn-svc/sessions/*-smoke/transcript.jsonl"
 ```
 
 - [ ] **Step 5: Smoke / and /assets** (will 404 until UI is deployed in Task 14, but route should exist)
 
 ```bash
-curl -sS -o /dev/null -w '%{http_code}\n' http://100.99.99.72:8300/
+curl -sS -o /dev/null -w '%{http_code}\n' http://<tailnet-ip>:8300/
 ```
 
 Expected: `404` (file not found at WEBAPP_ROOT/index.html — that's fine, route is registered) OR `500` (directory missing — also fine pre-deploy). The `404 Not Found` you'd see in JSON form is `{"detail":"Not Found"}` — confirms the route is mounted.
@@ -1237,7 +1237,7 @@ Expected: `404` (file not found at WEBAPP_ROOT/index.html — that's fine, route
 ## Task 9: client app.ts — replace IPC calls with fetch
 
 **Files:**
-- Modify: `/Users/nickcason/dev/cairn/src/renderer/app.ts`
+- Modify: `~/dev/cairn/src/renderer/app.ts`
 
 **SteeLL-v1 task:** No (touches live client logic).
 
@@ -1280,7 +1280,7 @@ Find the `void window.cairn.saveSession(meetingName, baked)` call inside the spe
 Replace the constant at top of file (line 7):
 
 ```typescript
-const CAIRN_SVC_URL = "ws://100.99.99.72:8300/ws/transcribe";
+const CAIRN_SVC_URL = "ws://<tailnet-ip>:8300/ws/transcribe";
 ```
 
 with:
@@ -1300,7 +1300,7 @@ Find `await fetch("../icons/cairn.svg")` (around line 60). Replace with:
 - [ ] **Step 5: Type-check**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -10
+cd ~/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -10
 ```
 
 Expected: 0 errors. (If `window.cairn.saveSession` / `readFile` are still referenced anywhere else, they'll show up here. The `declare global` block in `app.ts` lines 9-21 still declares them but they're unused — leave it for now; Task 11 cleans it up.)
@@ -1308,7 +1308,7 @@ Expected: 0 errors. (If `window.cairn.saveSession` / `readFile` are still refere
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add src/renderer/app.ts && git -c commit.gpgsign=false commit -m "feat(renderer): replace Electron saveSession IPC with fetch /sessions
+cd ~/dev/cairn && git add src/renderer/app.ts && git -c commit.gpgsign=false commit -m "feat(renderer): replace Electron saveSession IPC with fetch /sessions
 
 Renderer now POSTs the baked event log directly to the cairn-svc HTTP
 endpoint instead of going through main-process IPC. WS URL is derived
@@ -1322,7 +1322,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 10: client app.ts — URL-param-driven start + control_stop handling
 
 **Files:**
-- Modify: `/Users/nickcason/dev/cairn/src/renderer/app.ts`
+- Modify: `~/dev/cairn/src/renderer/app.ts`
 
 **SteeLL-v1 task:** No.
 
@@ -1360,7 +1360,7 @@ Delete lines starting with `const ctrl = window.cairnControl;` through the match
 Search:
 
 ```bash
-cd /Users/nickcason/dev/cairn && grep -n 'cairnControl\|reportState\|reportTranscript\|reportTranscriptSnapshot' src/renderer/app.ts
+cd ~/dev/cairn && grep -n 'cairnControl\|reportState\|reportTranscript\|reportTranscriptSnapshot' src/renderer/app.ts
 ```
 
 For each result, delete the line (or the surrounding `if (ctrl) { ... }` block when the whole conditional becomes empty).
@@ -1372,7 +1372,7 @@ Find the `declare global { interface Window { cairn: {...}; cairnControl?: {...}
 - [ ] **Step 5: Type-check**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -10
+cd ~/dev/cairn && npx tsc -p tsconfig.renderer.json --noEmit 2>&1 | tail -10
 ```
 
 Expected: 0 errors. If errors mention `window.cairn` somewhere, search for and delete those references too.
@@ -1380,7 +1380,7 @@ Expected: 0 errors. If errors mention `window.cairn` somewhere, search for and d
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add src/renderer/app.ts && git -c commit.gpgsign=false commit -m "feat(renderer): URL-param-driven start + WS control_stop handling
+cd ~/dev/cairn && git add src/renderer/app.ts && git -c commit.gpgsign=false commit -m "feat(renderer): URL-param-driven start + WS control_stop handling
 
 Replaces the Electron cairnControl IPC bridge with URL params for harness
 autostart and a server-pushed control_stop WS message for harness stop.
@@ -1395,8 +1395,8 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 11: client index.html + audio.ts — absolute asset paths
 
 **Files:**
-- Modify: `/Users/nickcason/dev/cairn/src/renderer/index.html`
-- Modify: `/Users/nickcason/dev/cairn/src/renderer/audio.ts`
+- Modify: `~/dev/cairn/src/renderer/index.html`
+- Modify: `~/dev/cairn/src/renderer/audio.ts`
 
 **SteeLL-v1 task:** No (small but visible).
 
@@ -1425,7 +1425,7 @@ becomes:
 - [ ] **Step 3: Build to confirm**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npm run build 2>&1 | tail -5
+cd ~/dev/cairn && npm run build 2>&1 | tail -5
 ```
 
 Expected: build succeeds, produces `dist/renderer/*.js`.
@@ -1433,7 +1433,7 @@ Expected: build succeeds, produces `dist/renderer/*.js`.
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add src/renderer/index.html src/renderer/audio.ts && git -c commit.gpgsign=false commit -m "feat(renderer): absolute /assets/* asset paths + viewport meta
+cd ~/dev/cairn && git add src/renderer/index.html src/renderer/audio.ts && git -c commit.gpgsign=false commit -m "feat(renderer): absolute /assets/* asset paths + viewport meta
 
 Asset URLs now resolve from any route depth (relative paths broke when
 served by FastAPI from /assets/* instead of file://). Viewport meta tag
@@ -1447,7 +1447,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 12: package.json — drop Electron, add deploy script
 
 **Files:**
-- Modify: `/Users/nickcason/dev/cairn/package.json`
+- Modify: `~/dev/cairn/package.json`
 
 **SteeLL-v1 task:** No.
 
@@ -1480,7 +1480,7 @@ Removed: `main`, `start`, `screenshot`, `record-demos`, `package`, `install-app`
 - [ ] **Step 2: Re-install to drop electron from node_modules**
 
 ```bash
-cd /Users/nickcason/dev/cairn && rm -rf node_modules && npm install 2>&1 | tail -3
+cd ~/dev/cairn && rm -rf node_modules && npm install 2>&1 | tail -3
 ```
 
 Expected: install completes without electron-postinstall steps.
@@ -1488,7 +1488,7 @@ Expected: install completes without electron-postinstall steps.
 - [ ] **Step 3: Build still works**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npm run build 2>&1 | tail -3
+cd ~/dev/cairn && npm run build 2>&1 | tail -3
 ```
 
 Expected: builds clean.
@@ -1496,7 +1496,7 @@ Expected: builds clean.
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add package.json package-lock.json && git -c commit.gpgsign=false commit -m "chore(package): drop electron + electron-builder, bump to 0.2.0
+cd ~/dev/cairn && git add package.json package-lock.json && git -c commit.gpgsign=false commit -m "chore(package): drop electron + electron-builder, bump to 0.2.0
 
 Removes the electron/electron-builder devDeps, the build block, and the
 package/install-app/start scripts. Adds a deploy script that builds the
@@ -1510,7 +1510,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 13: scripts/deploy-ui.sh
 
 **Files:**
-- Create: `/Users/nickcason/dev/cairn/scripts/deploy-ui.sh`
+- Create: `~/dev/cairn/scripts/deploy-ui.sh`
 
 **SteeLL-v1 task:** YES.
 
@@ -1536,10 +1536,10 @@ Behaviour:
      <stage>/assets/style.css
      <stage>/assets/audio-worklet.js
      <stage>/assets/icons/*.svg       (from src/icons)
-4. rsync -az --delete <stage>/ to nick@100.99.99.72:/home/nick/cairn-svc/webapp/
-5. ssh nick@100.99.99.72 "systemctl --user restart cairn-svc"
+4. rsync -az --delete <stage>/ to user@<tailnet-ip>:~/cairn-svc/webapp/
+5. ssh user@<tailnet-ip> "systemctl --user restart cairn-svc"
 6. clean up the temp dir
-7. echo "deployed -> https://precision-node4.taild99f50.ts.net/"
+7. echo "deployed -> https://<host>.<tailnet>.ts.net/"
 
 Show only the final shell script (no markdown fences).
 EOF
@@ -1564,22 +1564,22 @@ cp "$ROOT"/src/renderer/audio-worklet.js "$STAGE/assets/"
 cp "$ROOT"/src/icons/* "$STAGE/assets/icons/"
 cp "$ROOT"/src/renderer/index.html "$STAGE/index.html"
 
-rsync -az --delete "$STAGE/" nick@100.99.99.72:/home/nick/cairn-svc/webapp/
-ssh nick@100.99.99.72 "systemctl --user restart cairn-svc"
+rsync -az --delete "$STAGE/" user@<tailnet-ip>:~/cairn-svc/webapp/
+ssh user@<tailnet-ip> "systemctl --user restart cairn-svc"
 
-echo "deployed -> https://precision-node4.taild99f50.ts.net/"
+echo "deployed -> https://<host>.<tailnet>.ts.net/"
 ```
 
 Save and make executable:
 
 ```bash
-chmod +x /Users/nickcason/dev/cairn/scripts/deploy-ui.sh
+chmod +x ~/dev/cairn/scripts/deploy-ui.sh
 ```
 
 - [ ] **Step 3: Run a deploy**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npm run deploy 2>&1 | tail -10
+cd ~/dev/cairn && npm run deploy 2>&1 | tail -10
 ```
 
 Expected: build → rsync → restart → "deployed -> ...".
@@ -1587,7 +1587,7 @@ Expected: build → rsync → restart → "deployed -> ...".
 Verify on node4:
 
 ```bash
-ssh nick@100.99.99.72 "ls -la ~/cairn-svc/webapp/ ~/cairn-svc/webapp/assets/"
+ssh user@<tailnet-ip> "ls -la ~/cairn-svc/webapp/ ~/cairn-svc/webapp/assets/"
 ```
 
 Expected: index.html + assets/{app.js,*.js,style.css,audio-worklet.js,icons/}.
@@ -1595,8 +1595,8 @@ Expected: index.html + assets/{app.js,*.js,style.css,audio-worklet.js,icons/}.
 - [ ] **Step 4: Curl the deployed page**
 
 ```bash
-curl -sS http://100.99.99.72:8300/ | head -5
-curl -sS http://100.99.99.72:8300/assets/app.js | head -3
+curl -sS http://<tailnet-ip>:8300/ | head -5
+curl -sS http://<tailnet-ip>:8300/assets/app.js | head -3
 ```
 
 Expected: index HTML + JS module returned.
@@ -1604,7 +1604,7 @@ Expected: index HTML + JS module returned.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add scripts/deploy-ui.sh && git -c commit.gpgsign=false commit -m "scripts(deploy-ui): rsync UI bundle to node4 + restart cairn-svc
+cd ~/dev/cairn && git add scripts/deploy-ui.sh && git -c commit.gpgsign=false commit -m "scripts(deploy-ui): rsync UI bundle to node4 + restart cairn-svc
 
 Co-Authored-By: SteeLL-v1 <noreply@local>
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
@@ -1615,26 +1615,26 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 14: scripts/cairn-loop.sh — retarget URLs
 
 **Files:**
-- Modify: `/Users/nickcason/dev/cairn/scripts/cairn-loop.sh`
+- Modify: `~/dev/cairn/scripts/cairn-loop.sh`
 
 **SteeLL-v1 task:** No (correctness-critical for the test harness).
 
 - [ ] **Step 1: Read the current curl URLs**
 
 ```bash
-grep -n '127.0.0.1:8765\|cairn://\|open .*--args' /Users/nickcason/dev/cairn/scripts/cairn-loop.sh
+grep -n '127.0.0.1:8765\|cairn://\|open .*--args' ~/dev/cairn/scripts/cairn-loop.sh
 ```
 
 Note each line.
 
 - [ ] **Step 2: Replace control endpoint URLs**
 
-For each line referencing `http://127.0.0.1:8765/control/`, replace with `https://precision-node4.taild99f50.ts.net/control/`.
+For each line referencing `http://127.0.0.1:8765/control/`, replace with `https://<host>.<tailnet>.ts.net/control/`.
 
 Use `sed -i ''` (BSD sed) on macOS:
 
 ```bash
-sed -i '' 's|http://127.0.0.1:8765|https://precision-node4.taild99f50.ts.net|g' /Users/nickcason/dev/cairn/scripts/cairn-loop.sh
+sed -i '' 's|http://127.0.0.1:8765|https://<host>.<tailnet>.ts.net|g' ~/dev/cairn/scripts/cairn-loop.sh
 ```
 
 - [ ] **Step 3: Replace the "open Cairn.app" command with Safari open**
@@ -1642,7 +1642,7 @@ sed -i '' 's|http://127.0.0.1:8765|https://precision-node4.taild99f50.ts.net|g' 
 The harness probably calls something like `open -a Cairn` or `open cairn://...` to launch the Electron app. Replace with:
 
 ```bash
-open -a Safari "https://precision-node4.taild99f50.ts.net/?meeting_name=$MEETING_NAME&autostart=1"
+open -a Safari "https://<host>.<tailnet>.ts.net/?meeting_name=$MEETING_NAME&autostart=1"
 ```
 
 Locate the existing launch line manually (search for `Cairn.app` or `open -a Cairn`) and replace it. The exact variable name (`$MEETING_NAME`) may differ — read the script and use whatever it currently passes as the meeting name.
@@ -1653,14 +1653,14 @@ Skip the full grader — just verify the harness can hit start, reach state=reco
 
 ```bash
 # (modify cairn-loop.sh to take a short duration arg, OR run manually:)
-curl -sS -X POST https://precision-node4.taild99f50.ts.net/control/start \
+curl -sS -X POST https://<host>.<tailnet>.ts.net/control/start \
   -H 'content-type: application/json' \
   -d '{"meeting_name":"loop-smoke"}'
-open -a Safari 'https://precision-node4.taild99f50.ts.net/?meeting_name=loop-smoke&autostart=1'
+open -a Safari 'https://<host>.<tailnet>.ts.net/?meeting_name=loop-smoke&autostart=1'
 sleep 30
-curl -sS -X POST https://precision-node4.taild99f50.ts.net/control/stop
+curl -sS -X POST https://<host>.<tailnet>.ts.net/control/stop
 sleep 10
-curl -sS https://precision-node4.taild99f50.ts.net/control/status | python3 -m json.tool
+curl -sS https://<host>.<tailnet>.ts.net/control/status | python3 -m json.tool
 ```
 
 Expected: final status shows `state: "stopped"` and `session_dir: "..."`.
@@ -1668,7 +1668,7 @@ Expected: final status shows `state: "stopped"` and `session_dir: "..."`.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add scripts/cairn-loop.sh && git -c commit.gpgsign=false commit -m "scripts(cairn-loop): retarget URLs to tailnet HTTPS endpoint
+cd ~/dev/cairn && git add scripts/cairn-loop.sh && git -c commit.gpgsign=false commit -m "scripts(cairn-loop): retarget URLs to tailnet HTTPS endpoint
 
 Replaces the Electron 127.0.0.1:8765 control plane with the new
 cairn-svc tailnet HTTPS endpoint. Safari is now opened to the webapp
@@ -1689,7 +1689,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - [ ] **Step 1: Verify tailscale is up on node4 and has a cert**
 
 ```bash
-ssh nick@100.99.99.72 "tailscale status | head -3 && tailscale cert precision-node4.taild99f50.ts.net 2>&1 | head -5"
+ssh user@<tailnet-ip> "tailscale status | head -3 && tailscale cert <host>.<tailnet>.ts.net 2>&1 | head -5"
 ```
 
 The first cert command may take ~10s as the cert is minted. Expected: "Wrote ..." or "Certificate already exists for ...".
@@ -1697,7 +1697,7 @@ The first cert command may take ~10s as the cert is minted. Expected: "Wrote ...
 - [ ] **Step 2: Configure tailscale serve to front cairn-svc**
 
 ```bash
-ssh nick@100.99.99.72 "tailscale serve --bg --https=443 / http://localhost:8300"
+ssh user@<tailnet-ip> "tailscale serve --bg --https=443 / http://localhost:8300"
 ```
 
 Expected: prints the HTTPS URL the service is now reachable at. Persisted by tailscaled across reboots.
@@ -1707,7 +1707,7 @@ Expected: prints the HTTPS URL the service is now reachable at. Persisted by tai
 From the Mac:
 
 ```bash
-curl -sS https://precision-node4.taild99f50.ts.net/control/status | python3 -m json.tool
+curl -sS https://<host>.<tailnet>.ts.net/control/status | python3 -m json.tool
 ```
 
 Expected: same JSON as the plaintext smoke test in Task 8.2 — proves TLS termination + WebSocket upgrade reverse-proxy is working.
@@ -1715,7 +1715,7 @@ Expected: same JSON as the plaintext smoke test in Task 8.2 — proves TLS termi
 - [ ] **Step 4: Verify WSS upgrade works**
 
 ```bash
-ssh nick@100.99.99.72 "curl -sS -i -N --http1.1 \
+ssh user@<tailnet-ip> "curl -sS -i -N --http1.1 \
   -H 'Upgrade: websocket' -H 'Connection: Upgrade' \
   -H 'Sec-WebSocket-Key: $(openssl rand -base64 16)' \
   -H 'Sec-WebSocket-Version: 13' \
@@ -1729,7 +1729,7 @@ curl -sS -i -N --http1.1 \
   -H 'Upgrade: websocket' -H 'Connection: Upgrade' \
   -H 'Sec-WebSocket-Key: '"$(openssl rand -base64 16)" \
   -H 'Sec-WebSocket-Version: 13' \
-  https://precision-node4.taild99f50.ts.net/ws/transcribe 2>&1 | head -10
+  https://<host>.<tailnet>.ts.net/ws/transcribe 2>&1 | head -10
 ```
 
 Expected: same 101 Switching Protocols. If you get 502 / 504, `tailscale serve` is misconfigured — re-run step 2.
@@ -1749,7 +1749,7 @@ Document the one-time setup in a node4-side README or just journal note. (Option
 - [ ] **Step 1: Open the webapp in Mac Safari**
 
 ```bash
-open -a Safari https://precision-node4.taild99f50.ts.net/
+open -a Safari https://<host>.<tailnet>.ts.net/
 ```
 
 Expected: Cairn UI loads. Logo renders. Status shows "disconnected" → "connected" once you click Start.
@@ -1769,7 +1769,7 @@ Click Stop. Verify:
 - [ ] **Step 3: Verify the session was saved on node4**
 
 ```bash
-ssh nick@100.99.99.72 "ls -la ~/cairn-svc/sessions/ | tail -5; cat ~/cairn-svc/sessions/$(ls -t ~/cairn-svc/sessions/ | head -1)/meta.json"
+ssh user@<tailnet-ip> "ls -la ~/cairn-svc/sessions/ | tail -5; cat ~/cairn-svc/sessions/$(ls -t ~/cairn-svc/sessions/ | head -1)/meta.json"
 ```
 
 Expected: directory exists with `transcript.jsonl` + `meta.json`. meta.json has the meeting_name, saved_at, event_count.
@@ -1777,7 +1777,7 @@ Expected: directory exists with `transcript.jsonl` + `meta.json`. meta.json has 
 - [ ] **Step 4: Verify GET /sessions surfaces it**
 
 ```bash
-curl -sS https://precision-node4.taild99f50.ts.net/sessions | python3 -m json.tool | head -10
+curl -sS https://<host>.<tailnet>.ts.net/sessions | python3 -m json.tool | head -10
 ```
 
 - [ ] **Step 5: No commit** (validation only).
@@ -1797,7 +1797,7 @@ If anything in steps 1-4 fails, root-cause before continuing — do not declare 
 (or whatever fixture matches a known baseline — see memory `project_streaming_defers_to_auth.md` for last-logged numbers.)
 
 ```bash
-cd /Users/nickcason/dev/cairn && bash scripts/cairn-loop.sh diamandis-220 2>&1 | tee /tmp/loop-run.log | tail -30
+cd ~/dev/cairn && bash scripts/cairn-loop.sh diamandis-220 2>&1 | tee /tmp/loop-run.log | tail -30
 ```
 
 Expected: full loop completes — start → Safari opens → audio captures → stop → save → grader runs.
@@ -1836,7 +1836,7 @@ Append to `RESULTS.md` (Mac repo):
 Commit it:
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add RESULTS.md && git -c commit.gpgsign=false commit -m "docs(results): post-webapp-cutover bleed/accuracy parity check"
+cd ~/dev/cairn && git add RESULTS.md && git -c commit.gpgsign=false commit -m "docs(results): post-webapp-cutover bleed/accuracy parity check"
 ```
 
 ---
@@ -1853,13 +1853,13 @@ Do this LAST so that if Tasks 16-17 surfaced a regression, you still have the El
 - [ ] **Step 1: Delete the files**
 
 ```bash
-cd /Users/nickcason/dev/cairn && rm -f src/main.ts src/preload.ts tsconfig.json && rm -rf dist-app/
+cd ~/dev/cairn && rm -f src/main.ts src/preload.ts tsconfig.json && rm -rf dist-app/
 ```
 
 - [ ] **Step 2: Verify build still works**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npm run build 2>&1 | tail -3
+cd ~/dev/cairn && npm run build 2>&1 | tail -3
 ```
 
 Expected: builds clean (only `tsconfig.renderer.json` is referenced now).
@@ -1867,7 +1867,7 @@ Expected: builds clean (only `tsconfig.renderer.json` is referenced now).
 - [ ] **Step 3: Verify deploy still works**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npm run deploy 2>&1 | tail -3
+cd ~/dev/cairn && npm run deploy 2>&1 | tail -3
 ```
 
 Expected: rsyncs + restarts cairn-svc.
@@ -1881,7 +1881,7 @@ Replace the "Electron app" section of `README.md` with a single paragraph descri
 
 Live meeting transcription + speaker diarization, served from cairn-svc
 on node4 to any tailnet device. Open the webapp in Safari at
-https://precision-node4.taild99f50.ts.net/. Sessions land at
+https://<host>.<tailnet>.ts.net/. Sessions land at
 ~/cairn-svc/sessions/<slug>/ on node4. The Mac repo at this directory
 holds the renderer + harness; cairn-svc lives in ~/cairn-svc on node4
 (no GitHub remote — local commits only).
@@ -1892,7 +1892,7 @@ holds the renderer + harness; cairn-svc lives in ~/cairn-svc on node4
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git add -A && git -c commit.gpgsign=false commit -m "feat: remove Electron host code (cutover to webapp complete)
+cd ~/dev/cairn && git add -A && git -c commit.gpgsign=false commit -m "feat: remove Electron host code (cutover to webapp complete)
 
 Deletes src/main.ts, src/preload.ts, tsconfig.json (Electron-main config),
 and dist-app/. The renderer is now the only artifact, served as a static
@@ -1905,7 +1905,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - [ ] **Step 6: Push to GitHub**
 
 ```bash
-cd /Users/nickcason/dev/cairn && git push origin main
+cd ~/dev/cairn && git push origin main
 ```
 
 ---
@@ -1913,9 +1913,9 @@ cd /Users/nickcason/dev/cairn && git push origin main
 ## Task 19: Wrap-up — memory + status
 
 **Files:**
-- Create: `/Users/nickcason/.claude/projects/-Users-nickcason-dev-cairn/memory/project_webapp_cutover_landed.md`
-- Modify: `/Users/nickcason/.claude/projects/-Users-nickcason-dev-cairn/memory/MEMORY.md`
-- Modify: `/Users/nickcason/.claude/projects/-Users-nickcason-dev-cairn/memory/cairn_architecture.md` (it currently describes the two-repo split with Electron — update to reflect the webapp)
+- Create: `~/.claude/projects/-Users-nickcason-dev-cairn/memory/project_webapp_cutover_landed.md`
+- Modify: `~/.claude/projects/-Users-nickcason-dev-cairn/memory/MEMORY.md`
+- Modify: `~/.claude/projects/-Users-nickcason-dev-cairn/memory/cairn_architecture.md` (it currently describes the two-repo split with Electron — update to reflect the webapp)
 
 **SteeLL-v1 task:** No.
 

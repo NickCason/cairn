@@ -11,7 +11,9 @@ set -euo pipefail
 URL="${URL:-https://www.youtube.com/watch?v=ugvHCXCOmm4&t=194s}"
 DURATION="${DURATION:-600}"
 OUT_BASE="${OUT_BASE:-/tmp/cairn-test-runs}"
-CTRL="${CTRL:-https://precision-node4.taild99f50.ts.net}"
+# Where cairn-svc runs: its HTTPS URL, and user@host for ssh (both from the environment; nothing machine-specific is committed).
+CTRL="${CTRL:?set CTRL to the cairn-svc URL, e.g. https://<host>.<tailnet>.ts.net}"
+CAIRN_SSH="${CAIRN_SSH:?set CAIRN_SSH to user@host of the machine running cairn-svc}"
 REFERENCE="${REFERENCE:-$(dirname "$0")/fixtures/dario-reference-v2.json}"
 
 TS="$(date +%Y%m%d-%H%M%S)"
@@ -61,7 +63,7 @@ curl -fsS -X POST -H 'Content-Type: application/json' \
   "$CTRL/control/start" > "$OUT/start-resp.json" || true
 
 log "opening Cairn webapp in Safari"
-open -a Safari "https://precision-node4.taild99f50.ts.net/?meeting_name=$MEETING_NAME&autostart=1"
+open -a Safari "$CTRL/?meeting_name=$MEETING_NAME&autostart=1"
 sleep 3
 
 # 3. Poll /control/status until state becomes recording (up to 20s).
@@ -112,7 +114,7 @@ OSA
 # `open -a Safari <url>` on an already-open URL focuses that tab without
 # reloading. YouTube continues playing audio in the background unchanged.
 sleep 1
-open -a Safari "https://precision-node4.taild99f50.ts.net/?meeting_name=$MEETING_NAME&autostart=1"
+open -a Safari "$CTRL/?meeting_name=$MEETING_NAME&autostart=1"
 
 # YouTube autoplays the cued URL on its own. Don't send a play keystroke
 # here — that toggles play/pause, and if autoplay already fired it pauses
@@ -142,20 +144,20 @@ while :; do
   sleep 2
 done
 
-# 9.5 Wait for final_summary to land in the saved transcript.jsonl on node4.
-# Sessions live on node4 at $SESS_DIR; poll via SSH.
+# 9.5 Wait for final_summary to land in the saved transcript.jsonl on the cairn-svc host.
+# Sessions live there at $SESS_DIR; poll via SSH.
 SESS_DIR="$(curl -fsS "$CTRL/control/status" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("session_dir",""))')"
 if [[ -n "$SESS_DIR" ]]; then
-  log "waiting for final_summary in $SESS_DIR/transcript.jsonl on node4 (max 300s)"
+  log "waiting for final_summary in $SESS_DIR/transcript.jsonl on $CAIRN_SSH (max 300s)"
   deadline=$((SECONDS + 300))
-  until ssh nick@100.99.99.72 "grep -q '\"type\":\"final_summary\"' '$SESS_DIR/transcript.jsonl' 2>/dev/null"; do
+  until ssh "$CAIRN_SSH" "grep -q '\"type\":\"final_summary\"' '$SESS_DIR/transcript.jsonl' 2>/dev/null"; do
     (( SECONDS < deadline )) || { log "WARN: final_summary not seen in 300s; continuing"; break; }
     sleep 2
   done
-  if ssh nick@100.99.99.72 "grep -q '\"type\":\"final_summary\"' '$SESS_DIR/transcript.jsonl' 2>/dev/null"; then
+  if ssh "$CAIRN_SSH" "grep -q '\"type\":\"final_summary\"' '$SESS_DIR/transcript.jsonl' 2>/dev/null"; then
     log "final_summary present"
   fi
-  scp "nick@100.99.99.72:$SESS_DIR/transcript.jsonl" "$OUT/session.jsonl" 2>/dev/null || true
+  scp "$CAIRN_SSH:$SESS_DIR/transcript.jsonl" "$OUT/session.jsonl" 2>/dev/null || true
 fi
 
 # 10. Snapshot transcript.

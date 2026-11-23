@@ -86,7 +86,7 @@ test("escapeHtml escapes the four core chars", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 ```bash
-cd /Users/nickcason/dev/cairn && node --test src/renderer/speaker-substitute.test.mjs
+cd ~/dev/cairn && node --test src/renderer/speaker-substitute.test.mjs
 ```
 
 Expected: FAIL with `Cannot find module './speaker-substitute.js'`.
@@ -137,7 +137,7 @@ export function escapeHtml(s: string): string {
 - [ ] **Step 4: Build TypeScript and run tests**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npx tsc -p tsconfig.renderer.json && node --test src/renderer/speaker-substitute.test.mjs
+cd ~/dev/cairn && npx tsc -p tsconfig.renderer.json && node --test src/renderer/speaker-substitute.test.mjs
 ```
 
 Expected: PASS, all 7 tests pass.
@@ -489,7 +489,7 @@ Append to `src/renderer/style.css`:
 - [ ] **Step 4: Build and manually verify**
 
 ```bash
-cd /Users/nickcason/dev/cairn && npx tsc && npx tsc -p tsconfig.renderer.json
+cd ~/dev/cairn && npx tsc && npx tsc -p tsconfig.renderer.json
 ```
 
 Then launch Cairn, record a 90-second clip, rename a speaker via the speakers panel, and verify the rolling summary card text updates in place with the new colored name.
@@ -799,14 +799,14 @@ git commit -m "feat(renderer): timestamps + spring slide-in + relabel pulse + ac
 
 ## Task 7: Svc — _apply_canonical_substitute_retro helper + tests
 
-**Files (on node4 at `/home/nick/cairn-svc/`):**
+**Files (on node4 at `~/cairn-svc/`):**
 - Create: `tests/test_canonical_substitute_retro.py`
 - Modify: `cairn_svc/server.py`
 
 - [ ] **Step 1: SSH to node4 and write a failing test**
 
 ```bash
-ssh node4 'cd /home/nick/cairn-svc && cat > tests/test_canonical_substitute_retro.py' <<'EOF'
+ssh node4 'cd ~/cairn-svc && cat > tests/test_canonical_substitute_retro.py' <<'EOF'
 import asyncio
 import pytest
 from cairn_svc.session import Session
@@ -880,7 +880,7 @@ EOF
 - [ ] **Step 2: Run test to verify it fails**
 
 ```bash
-ssh node4 'cd /home/nick/cairn-svc && pytest tests/test_canonical_substitute_retro.py -v'
+ssh node4 'cd ~/cairn-svc && pytest tests/test_canonical_substitute_retro.py -v'
 ```
 
 Expected: FAIL with `ImportError: cannot import name '_apply_canonical_substitute_retro'`.
@@ -888,7 +888,7 @@ Expected: FAIL with `ImportError: cannot import name '_apply_canonical_substitut
 - [ ] **Step 3: Implement the helper in server.py**
 
 ```bash
-ssh node4 'cd /home/nick/cairn-svc && grep -n "^async def _apply_rename_retro" cairn_svc/server.py'
+ssh node4 'cd ~/cairn-svc && grep -n "^async def _apply_rename_retro" cairn_svc/server.py'
 ```
 
 Note the line number (around 499). Append a new function immediately after `_apply_rename_retro` ends (find the next `def` or `async def` and insert before it). Use this implementation:
@@ -967,12 +967,12 @@ async def _apply_canonical_substitute_retro(
             await emit(new_final)
 ```
 
-(Use whatever editor you prefer; `vi /home/nick/cairn-svc/cairn_svc/server.py` then `:%s/...`. Or use the Edit tool over ssh by copying the file local, editing, scp back.)
+(Use whatever editor you prefer; `vi ~/cairn-svc/cairn_svc/server.py` then `:%s/...`. Or use the Edit tool over ssh by copying the file local, editing, scp back.)
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 ```bash
-ssh node4 'cd /home/nick/cairn-svc && pytest tests/test_canonical_substitute_retro.py -v'
+ssh node4 'cd ~/cairn-svc && pytest tests/test_canonical_substitute_retro.py -v'
 ```
 
 Expected: PASS, both tests pass.
@@ -980,7 +980,7 @@ Expected: PASS, both tests pass.
 - [ ] **Step 5: Commit on node4**
 
 ```bash
-ssh node4 'cd /home/nick/cairn-svc && git add tests/test_canonical_substitute_retro.py cairn_svc/server.py && git commit -m "feat(svc): _apply_canonical_substitute_retro for internal merges"'
+ssh node4 'cd ~/cairn-svc && git add tests/test_canonical_substitute_retro.py cairn_svc/server.py && git commit -m "feat(svc): _apply_canonical_substitute_retro for internal merges"'
 ```
 
 ---
@@ -993,7 +993,7 @@ ssh node4 'cd /home/nick/cairn-svc && git add tests/test_canonical_substitute_re
 - [ ] **Step 1: Find all merge_stable call sites**
 
 ```bash
-ssh node4 'cd /home/nick/cairn-svc && grep -nE "merge_stable\(|session\.merge_stable" cairn_svc/server.py'
+ssh node4 'cd ~/cairn-svc && grep -nE "merge_stable\(|session\.merge_stable" cairn_svc/server.py'
 ```
 
 Expected: 1-2 hits. The known ones are in `_run_authoritative_pass` (orphan-merge) and the rename merge path. Note each line.
@@ -1011,7 +1011,7 @@ Where `emit_fn_in_scope` is whatever emit callable is in the surrounding scope (
 - [ ] **Step 3: Run the full svc test suite**
 
 ```bash
-ssh node4 'cd /home/nick/cairn-svc && pytest -x -q'
+ssh node4 'cd ~/cairn-svc && pytest -x -q'
 ```
 
 Expected: all tests pass (the existing 119 + 2 new = 121).
@@ -1019,7 +1019,7 @@ Expected: all tests pass (the existing 119 + 2 new = 121).
 - [ ] **Step 4: Commit + restart svc**
 
 ```bash
-ssh node4 'cd /home/nick/cairn-svc && git add cairn_svc/server.py && git commit -m "feat(svc): wire canonical-substitute retro into merge call sites" && sudo systemctl restart cairn-svc'
+ssh node4 'cd ~/cairn-svc && git add cairn_svc/server.py && git commit -m "feat(svc): wire canonical-substitute retro into merge call sites" && sudo systemctl restart cairn-svc'
 ```
 
 Verify svc is healthy:
@@ -1037,7 +1037,7 @@ ssh node4 'sudo systemctl status cairn-svc | head -10'
 - [ ] **Step 1: Run a 5-minute test against the YouTube fixture**
 
 ```bash
-cd /Users/nickcason/dev/cairn && scripts/cairn-loop.sh --duration 300 --out /tmp/cairn-test-runs
+cd ~/dev/cairn && scripts/cairn-loop.sh --duration 300 --out /tmp/cairn-test-runs
 ```
 
 - [ ] **Step 2: While recording, rename two speakers**

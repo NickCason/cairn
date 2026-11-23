@@ -1008,7 +1008,7 @@ Expected: no traceback, "Application startup complete" line present.
 
 - [ ] **Step 1: Rebuild and refresh symlink**
 
-Run from `/Users/nickcason/dev/cairn`:
+Run from `~/dev/cairn`:
 
 ```bash
 npm run install-app
